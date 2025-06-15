@@ -6,15 +6,18 @@ import { cookies } from "next/headers";
 
 export async function POST(req: NextRequest) {
   const accessToken = process.env.ACCESS_TOKEN!;
+  console.time("📩 Emails are fetched");
   const emails = await fetchEmail(accessToken);
+  console.timeEnd("📩 Emails are fetched");
 
   if (emails instanceof Response) {
     return emails;
   }
-
+  console.time("📊 Analyze Stats");
   const stats = analyzeSenders(emails);
+  console.timeEnd("📊 Analyze Stats");
 
-  // Store in Supabase
+  console.time("⬆️ Insert into Supabase");
   const supabase = createClient(cookies());
   const { data, error } = await supabase.from("email_stats").upsert(
     stats.map((stat) => ({
@@ -26,6 +29,7 @@ export async function POST(req: NextRequest) {
     })),
     { onConflict: "domain" }
   );
+  console.timeEnd("⬆️ Insert into Supabase");
 
   if (error) {
     console.error("Error storing stats:", error);

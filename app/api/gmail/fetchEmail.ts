@@ -13,6 +13,72 @@ interface EmailMetadata {
   date: string;
 }
 
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelay: number = 1000
+): Promise<T> {
+  let retries = 0;
+  let delay = initialDelay;
+
+  while (true) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      if (
+        retries >= maxRetries ||
+        (error?.response?.status !== 503 && error?.response?.status !== 429)
+      ) {
+        throw error;
+      }
+
+      retries++;
+      console.log(
+        `Retrying after ${delay}ms (attempt ${retries}/${maxRetries})`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      delay *= 2; // Exponential backoff
+    }
+  }
+}
+
+async function processBatch(
+  gmail: any,
+  messages: { id: string }[],
+  start: number,
+  end: number
+): Promise<EmailMetadata[]> {
+  const batch = messages.slice(start, end);
+  const results = await Promise.all(
+    batch.map((msg) =>
+      retryWithBackoff(() =>
+        gmail.users.messages.get({
+          userId: "me",
+          id: msg.id,
+          format: "metadata",
+          metadataHeaders: ["Subject", "From", "Date"],
+        })
+      )
+    )
+  );
+
+  return results.map((message: any, index) => {
+    const headers = message.data.payload?.headers as EmailHeader[] | undefined;
+    const headersMap: Record<string, string> = {};
+
+    if (headers) {
+      headers.forEach((h) => (headersMap[h.name] = h.value));
+    }
+
+    return {
+      id: batch[index].id,
+      subject: headersMap["Subject"] || "",
+      from: headersMap["From"] || "",
+      date: headersMap["Date"] || "",
+    };
+  });
+}
+
 export async function fetchEmail(access_token: string) {
   if (!access_token) {
     return Response.json({ error: "Access token not found" }, { status: 401 });
@@ -42,27 +108,33 @@ export async function fetchEmail(access_token: string) {
     let nextPageToken: string | null = null;
 
     do {
-      const res = await gmail.users.messages.list({
-        userId: "me",
-        q: query,
-        maxResults: 100,
-        pageToken: nextPageToken ?? undefined,
-      });
+      const res = await retryWithBackoff(() =>
+        gmail.users.messages.list({
+          userId: "me",
+          q: query,
+          maxResults: 100,
+          pageToken: nextPageToken ?? undefined,
+        })
+      );
 
-      const messages = res.data.messages || [];
+      const messages = (res.data.messages || []).filter(
+        (msg): msg is { id: string } => msg.id !== null && msg.id !== undefined
+      );
       allMessages.push(...messages);
 
-      nextPageToken = res.data.nextPageToken;
+      nextPageToken = res.data.nextPageToken || null;
     } while (nextPageToken);
 
     const detailedEmails = await Promise.all(
       allMessages.map(async (msg) => {
-        const message = await gmail.users.messages.get({
-          userId: "me",
-          id: msg.id,
-          format: "metadata",
-          metadataHeaders: ["Subject", "From", "Date"],
-        });
+        const message = await retryWithBackoff(() =>
+          gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["Subject", "From", "Date"],
+          })
+        );
 
         const headers = message.data.payload?.headers as
           | EmailHeader[]
@@ -81,7 +153,6 @@ export async function fetchEmail(access_token: string) {
         } as EmailMetadata;
       })
     );
-    console.log("📩 Emails are fetched...")
     return detailedEmails;
   } catch (error) {
     console.error("Gmail API Error:", error);
