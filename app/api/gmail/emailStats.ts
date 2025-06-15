@@ -71,6 +71,6 @@ export function analyzeSenders(
 
   // Sort by most emails
   result.sort((a, b) => b.totalEmails - a.totalEmails);
-
+  console.log("📊 Emails have been Analysed")
   return result;
 }

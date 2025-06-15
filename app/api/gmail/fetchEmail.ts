@@ -81,6 +81,7 @@ export async function fetchEmail(access_token: string) {
         } as EmailMetadata;
       })
     );
+    console.log("📩 Emails are fetched...")
     return detailedEmails;
   } catch (error) {
     console.error("Gmail API Error:", error);
