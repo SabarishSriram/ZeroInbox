@@ -1,7 +1,19 @@
 export function analyzeSenders(
-  emailData: { id: string; from: string; date: string }[]
+  emailData: {
+    id: string;
+    from: string;
+    date: string;
+    listUnsubscribe?: string;
+  }[]
 ) {
-  const companyMap: Record<string, { count: number; dates: string[] }> = {};
+  const companyMap: Record<
+    string,
+    {
+      count: number;
+      dates: string[];
+      listUnsubscribe?: string;
+    }
+  > = {};
 
   for (const email of emailData) {
     const fromHeader = email.from;
@@ -17,6 +29,11 @@ export function analyzeSenders(
 
     companyMap[domain].count += 1;
     companyMap[domain].dates.push(email.date);
+
+    // Store the List-Unsubscribe header if present
+    if (email.listUnsubscribe) {
+      companyMap[domain].listUnsubscribe = email.listUnsubscribe;
+    }
   }
 
   const today = new Date();
@@ -66,6 +83,7 @@ export function analyzeSenders(
       companyName: domain.split(".").slice(0, -1).join("."),
       totalEmails: data.count,
       weeklyAvg: +(data.count / domainWeeks).toFixed(2),
+      listUnsubscribe: data.listUnsubscribe,
     };
   });
 

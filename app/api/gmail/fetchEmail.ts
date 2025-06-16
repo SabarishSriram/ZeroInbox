@@ -11,6 +11,7 @@ interface EmailMetadata {
   subject: string;
   from: string;
   date: string;
+  listUnsubscribe?: string;
 }
 
 async function retryWithBackoff<T>(
@@ -33,9 +34,6 @@ async function retryWithBackoff<T>(
       }
 
       retries++;
-      console.log(
-        `Retrying after ${delay}ms (attempt ${retries}/${maxRetries})`
-      );
       await new Promise((resolve) => setTimeout(resolve, delay));
       delay *= 2; // Exponential backoff
     }
@@ -55,8 +53,7 @@ async function processBatch(
         gmail.users.messages.get({
           userId: "me",
           id: msg.id,
-          format: "metadata",
-          metadataHeaders: ["Subject", "From", "Date"],
+          format: "full",
         })
       )
     )
@@ -67,7 +64,9 @@ async function processBatch(
     const headersMap: Record<string, string> = {};
 
     if (headers) {
-      headers.forEach((h) => (headersMap[h.name] = h.value));
+      headers.forEach((h) => {
+        headersMap[h.name] = h.value;
+      });
     }
 
     return {
@@ -75,6 +74,7 @@ async function processBatch(
       subject: headersMap["Subject"] || "",
       from: headersMap["From"] || "",
       date: headersMap["Date"] || "",
+      listUnsubscribe: headersMap["List-Unsubscribe"] || "",
     };
   });
 }
@@ -131,8 +131,7 @@ export async function fetchEmail(access_token: string) {
           gmail.users.messages.get({
             userId: "me",
             id: msg.id,
-            format: "metadata",
-            metadataHeaders: ["Subject", "From", "Date"],
+            format: "full",
           })
         );
 
@@ -142,7 +141,9 @@ export async function fetchEmail(access_token: string) {
         const headersMap: Record<string, string> = {};
 
         if (headers) {
-          headers.forEach((h) => (headersMap[h.name] = h.value));
+          headers.forEach((h) => {
+            headersMap[h.name] = h.value;
+          });
         }
 
         return {
@@ -150,12 +151,12 @@ export async function fetchEmail(access_token: string) {
           subject: headersMap["Subject"] || "",
           from: headersMap["From"] || "",
           date: headersMap["Date"] || "",
+          listUnsubscribe: headersMap["List-Unsubscribe"] || "",
         } as EmailMetadata;
       })
     );
     return detailedEmails;
   } catch (error) {
-    console.error("Gmail API Error:", error);
     return Response.json(
       { error: "Failed to fetch emails. Please check your access token." },
       { status: 401 }
