@@ -98,7 +98,9 @@ export async function POST(req: NextRequest) {
         pageToken: nextPageToken ?? undefined,
       })
     );
-    const messages = (res.data.messages || []).filter((msg) => msg.id);
+    const messages = (res.data.messages || [])
+      .filter((msg) => typeof msg.id === "string")
+      .map((msg) => ({ id: msg.id as string }));
     allMessages.push(...messages);
     nextPageToken = res.data.nextPageToken || null;
   } while (nextPageToken);
