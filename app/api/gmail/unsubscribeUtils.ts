@@ -82,11 +82,11 @@ export async function updateUnsubscribeInfoForDomain(
 /**
  * Process existing emails from a domain
  */
-async function processExistingEmails(
+export async function processExistingEmails(
   gmail: any,
   domain: string,
   action: "trash" | "delete"
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     // Search for all messages from the domain
     const response = await gmail.users.messages.list({
@@ -96,10 +96,14 @@ async function processExistingEmails(
 
     const messages = response.data.messages || [];
     if (messages.length === 0) {
-      return { success: true };
+      return {
+        success: false,
+        error: `No emails found from domain: ${domain}. Please check if the domain is correct.`,
+      };
     }
 
     const messageIds = messages.map((msg: any) => msg.id);
+    console.log(`Found ${messageIds.length} messages to process`);
 
     if (action === "trash") {
       // Move to trash
@@ -112,21 +116,106 @@ async function processExistingEmails(
         },
       });
     } else {
-      // Permanently delete
-      await gmail.users.messages.batchDelete({
-        userId: "me",
-        requestBody: {
-          ids: messageIds,
-        },
-      });
+      // Permanently delete - process in batches of 100 to avoid rate limits
+      const batchSize = 100;
+      for (let i = 0; i < messageIds.length; i += batchSize) {
+        const batch = messageIds.slice(i, i + batchSize);
+        console.log(
+          `Processing batch ${i / batchSize + 1} of ${Math.ceil(
+            messageIds.length / batchSize
+          )}`
+        );
+
+        try {
+          // First move to trash
+          await gmail.users.messages.batchModify({
+            userId: "me",
+            requestBody: {
+              ids: batch,
+              addLabelIds: ["TRASH"],
+              removeLabelIds: ["INBOX"],
+            },
+          });
+
+          // Then permanently delete
+          await gmail.users.messages.batchDelete({
+            userId: "me",
+            requestBody: {
+              ids: batch,
+            },
+          });
+        } catch (batchError: any) {
+          console.error(
+            `Error processing batch ${i / batchSize + 1}:`,
+            batchError
+          );
+          if (batchError.response?.data?.error) {
+            console.error("API Error details:", batchError.response.data.error);
+            return {
+              success: false,
+              error: `Failed to process batch of emails: ${
+                batchError.response.data.error.message || "Unknown error"
+              }`,
+            };
+          }
+          throw batchError;
+        }
+      }
     }
 
-    return { success: true };
-  } catch (error) {
+    return {
+      success: true,
+      message: `Successfully processed ${messageIds.length} emails from ${domain}`,
+    };
+  } catch (error: any) {
     console.error("Error processing existing emails:", error);
+    if (error.response?.data?.error) {
+      console.error("API Error details:", error.response.data.error);
+      const errorMessage = error.response.data.error.message || "Unknown error";
+
+      // Handle specific error cases
+      if (errorMessage.includes("insufficient authentication scopes")) {
+        return {
+          success: false,
+          error:
+            "Insufficient permissions to perform this action. Please check your Gmail API scopes.",
+        };
+      }
+
+      if (errorMessage.includes("Invalid query")) {
+        return {
+          success: false,
+          error: `Invalid domain format: ${domain}. Please check the domain and try again.`,
+        };
+      }
+
+      return {
+        success: false,
+        error: `Gmail API Error: ${errorMessage}`,
+      };
+    }
+
+    if (error.response?.status === 403) {
+      return {
+        success: false,
+        error:
+          "Insufficient permissions to perform this action. Please check your Gmail API scopes.",
+      };
+    }
+
+    if (error.response?.status === 404) {
+      return {
+        success: false,
+        error: `Domain not found: ${domain}. Please check if the domain is correct.`,
+      };
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
+      error:
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred while processing emails.",
     };
   }
 }
@@ -210,25 +299,28 @@ export async function handleUnsubscribe(
   { domain, action, userId }: UnsubscribeAction
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Step 1: Process existing emails
+    // Step 1: Process existing emails (trash or delete them)
     const existingResult = await processExistingEmails(gmail, domain, action);
     if (!existingResult.success) {
       return existingResult;
     }
 
-    // Step 2: Create Gmail filter for future emails
-    const filterResult = await createGmailFilter(gmail, domain, action);
-    if (!filterResult.success) {
-      return filterResult;
-    }
+    // ✅ Only create filter and store unsubscribe info if action is "trash"
+    if (action === "trash") {
+      // Step 2: Create Gmail filter for future emails
+      const filterResult = await createGmailFilter(gmail, domain, action);
+      if (!filterResult.success) {
+        return filterResult;
+      }
 
-    // Step 3: Store unsubscribe information
-    await storeUnsubscribeInfo(
-      createClient(cookies()),
-      domain,
-      action,
-      filterResult.filterId!
-    );
+      // Step 3: Store unsubscribe info
+      await storeUnsubscribeInfo(
+        createClient(cookies()),
+        domain,
+        action,
+        filterResult.filterId!
+      );
+    }
 
     return { success: true };
   } catch (error) {
