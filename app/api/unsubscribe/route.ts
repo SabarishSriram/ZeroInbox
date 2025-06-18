@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   });
   const gmail = google.gmail({ version: "v1", auth });
 
-  // 1. Query Gmail for all messages from the target
+  // Step 1: Fetch messages
   let allMessages: { id: string }[] = [];
   let nextPageToken: string | null = null;
   do {
@@ -63,7 +63,6 @@ export async function POST(req: NextRequest) {
         pageToken: nextPageToken ?? undefined,
       })
     );
-    // Only keep messages with a valid id (string)
     const messages = (res.data.messages || []).filter(
       (msg): msg is { id: string } => !!msg.id
     );
@@ -80,54 +79,78 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 2. Batch process (trash or delete)
+  // Step 2: Process messages
   const batchSize = 100;
   let processed = 0;
-  let errors = [];
+  const errors = [];
+
   for (let i = 0; i < messageIds.length; i += batchSize) {
     const batch = messageIds.slice(i, i + batchSize);
     try {
-      if (action === "trash") {
-        await retryWithBackoff(() =>
-          gmail.users.messages.batchModify({
-            userId: "me",
-            requestBody: {
-              ids: batch,
-              addLabelIds: ["TRASH"],
-              removeLabelIds: ["INBOX"],
-            },
-          })
-        );
-      } else if (action === "delete") {
-        // Move to trash first (Gmail requires this before permanent delete)
-        await retryWithBackoff(() =>
-          gmail.users.messages.batchModify({
-            userId: "me",
-            requestBody: {
-              ids: batch,
-              addLabelIds: ["TRASH"],
-              removeLabelIds: ["INBOX"],
-            },
-          })
-        );
-        await retryWithBackoff(() =>
-          gmail.users.messages.batchDelete({
-            userId: "me",
-            requestBody: { ids: batch },
-          })
-        );
+      // Trash (or prepare to delete)
+      await retryWithBackoff(() =>
+        gmail.users.messages.batchModify({
+          userId: "me",
+          requestBody: {
+            ids: batch,
+            addLabelIds: ["TRASH"],
+            removeLabelIds: ["INBOX"],
+          },
+        })
+      );
+
+      if (action === "delete") {
+        try {
+          // Try batch delete
+          await retryWithBackoff(() =>
+            gmail.users.messages.batchDelete({
+              userId: "me",
+              requestBody: { ids: batch },
+            })
+          );
+        } catch (batchDeleteError: any) {
+          console.error(
+            `[UNSUB API] Batch delete failed on batch ${i / batchSize + 1}`,
+            batchDeleteError
+          );
+
+          // Retry individually
+          for (const msgId of batch) {
+            try {
+              await retryWithBackoff(() =>
+                gmail.users.messages.delete({
+                  userId: "me",
+                  id: msgId,
+                })
+              );
+            } catch (individualError) {
+              console.error("[UNSUB API] Individual delete failed:", {
+                msgId,
+                error: individualError,
+              });
+              errors.push({
+                batch: i / batchSize + 1,
+                msgId,
+                error: (individualError as any)?.message || individualError,
+              });
+            }
+          }
+        }
       }
+
       processed += batch.length;
     } catch (err: any) {
-      errors.push({ batch: i / batchSize + 1, error: err?.message || err });
+      console.error("[UNSUB API] Batch trash/delete failed:", err);
+      errors.push({
+        batch: i / batchSize + 1,
+        error: err?.message || err,
+      });
     }
   }
 
-  // 3. Always attempt DB update and log, even if processed is 0
+  // Step 3: Log to Supabase
   const supabase = createClient(cookies());
   try {
-    console.log("[UNSUB API] DB update for", { target, action, processed });
-    // Upsert unsubscribed_senders
     const { data: unsubUpsertData, error: unsubUpsertError } = await supabase
       .from("unsubscribed_senders")
       .upsert(
@@ -138,38 +161,21 @@ export async function POST(req: NextRequest) {
         },
         { onConflict: "sender" }
       );
-    console.log("[UNSUB API] Upsert unsubscribed_senders:", {
-      target,
-      unsubUpsertData,
-      unsubUpsertError,
-    });
-    // Remove from email_stats
+
     const { data: statsDeleteData, error: statsDeleteError } = await supabase
       .from("email_stats")
       .delete()
       .or(`sender_email.eq.${target},domain.eq.${target}`);
-    console.log("[UNSUB API] Delete from email_stats:", {
-      target,
-      statsDeleteData,
-      statsDeleteError,
-    });
-    if (unsubUpsertError) {
-      console.error(
-        "[UNSUB API] Failed to upsert into unsubscribed_senders:",
-        unsubUpsertError
-      );
-    }
-    if (statsDeleteError) {
-      console.error(
-        "[UNSUB API] Failed to delete from email_stats:",
-        statsDeleteError
-      );
-    }
-  } catch (err) {
-    console.error("[UNSUB API] Exception in DB update block:", err);
-  }
-  // Do NOT delete from unsubscribed_senders if deleted; keep record
 
+    if (unsubUpsertError)
+      console.error("[UNSUB API] Failed to upsert:", unsubUpsertError);
+    if (statsDeleteError)
+      console.error("[UNSUB API] Failed to delete stats:", statsDeleteError);
+  } catch (err) {
+    console.error("[UNSUB API] Supabase update failed:", err);
+  }
+
+  // Step 4: Return result
   return NextResponse.json({
     success: errors.length === 0,
     total: messageIds.length,
@@ -178,6 +184,8 @@ export async function POST(req: NextRequest) {
     message:
       errors.length === 0
         ? `All messages ${action === "trash" ? "moved to trash" : "deleted"}.`
-        : "Some batches failed. See errors.",
+        : `Some messages ${action === "trash" ? "trashed" : "deleted"}, but ${
+            errors.length
+          } failed.`,
   });
 }

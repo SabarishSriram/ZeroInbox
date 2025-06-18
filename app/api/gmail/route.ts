@@ -84,6 +84,9 @@ export async function POST(req: NextRequest) {
   const query = `in:inbox after:${formattedDate}`;
   // --- End incremental fetching logic ---
 
+  // Add support for returning a list of emails if requested (for demo/fetch-emails page)
+  const returnEmails = req.headers.get("x-return-emails") === "true";
+
   let allMessages: { id: string }[] = [];
   let nextPageToken: string | null = null;
   // Removed maxEmails and fetched counter for full 1 month fetch
@@ -94,7 +97,7 @@ export async function POST(req: NextRequest) {
       gmail.users.messages.list({
         userId: "me",
         q: query,
-        maxResults: 100,
+        maxResults: 10, // Only fetch 10 for demo
         pageToken: nextPageToken ?? undefined,
       })
     );
@@ -103,7 +106,33 @@ export async function POST(req: NextRequest) {
       .map((msg) => ({ id: msg.id as string }));
     allMessages.push(...messages);
     nextPageToken = res.data.nextPageToken || null;
-  } while (nextPageToken);
+  } while (nextPageToken && allMessages.length < 10);
+
+  // Fetch message details for demo
+  if (returnEmails) {
+    const emails = await Promise.all(
+      allMessages.map((msg) =>
+        retryWithBackoff(() =>
+          gmail.users.messages.get({
+            userId: "me",
+            id: msg.id,
+            format: "metadata",
+            metadataHeaders: ["From", "Subject", "Date"],
+          })
+        )
+      )
+    );
+    return NextResponse.json({
+      emails: emails.map((res) => {
+        const headers = res.data.payload?.headers || [];
+        const from = headers.find((h: any) => h.name === "From")?.value || "";
+        const subject =
+          headers.find((h: any) => h.name === "Subject")?.value || "";
+        const date = headers.find((h: any) => h.name === "Date")?.value || "";
+        return { from, subject, date, snippet: res.data.snippet };
+      }),
+    });
+  }
 
   // 2. Fetch message details in batches
   const batchSize = 50;
