@@ -1,26 +1,36 @@
 "use client";
 import { useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+);
 
 export default function SignupPage() {
-  useEffect(() => {
-    // Google OAuth2 endpoint for requesting an access token
-    const params = new URLSearchParams({
-      client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-      redirect_uri: `${window.location.origin}/api/auth/callback`,
-      response_type: "token",
-      scope: [
-        "https://www.googleapis.com/auth/gmail.readonly",
-        "https://www.googleapis.com/auth/gmail.modify",
-      ].join(" "),
-      include_granted_scopes: "true",
-      state: "signup",
+  const handleGoogleSignup = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        scopes: [
+          "https://www.googleapis.com/auth/gmail.readonly",
+          "https://www.googleapis.com/auth/gmail.modify",
+        ].join(" "),
+      },
     });
-    (
-      window as any
-    ).googleOAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-  }, []);
-  const handleGoogleSignup = () => {
-    window.location.href = (window as any).googleOAuthUrl;
+
+    if (error) {
+      console.error("Error during Google signup:", error.message);
+      return;
+    }
   };
 
   return (
