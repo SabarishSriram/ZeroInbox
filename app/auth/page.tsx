@@ -22,7 +22,7 @@ export default function SignupPage() {
   useEffect(() => {
     (async () => {
       const { data: session } = await supabase.auth.getSession();
-      if (session?.session?.user) {
+      if (session?.session?.user && session.session.provider_token) {
         router.replace("/dashboard");
       } else {
         setChecked(true);
@@ -89,7 +89,7 @@ export default function SignupPage() {
               type="submit"
               variant="outline"
               disabled={isLoading}
-              className={googleButtonClasses}
+              className="w-full h-12 flex items-center justify-center px-4 rounded-xl border-hovered hover:bg-secondary text-muted-foreground"
             >
               <GoogleIcon className="mr-2 h-5 w-5" /> Continue with Google
             </Button>
