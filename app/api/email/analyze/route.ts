@@ -125,8 +125,7 @@ export async function POST(req: NextRequest) {
     const res = await retryWithBackoff(() =>
       gmail.users.messages.list({
         userId: "me",
-        q: query,
-        maxResults: 10, // Only fetch 10 for demo
+        q: query, // Only fetch 10 for demo
         pageToken: nextPageToken ?? undefined,
       })
     );

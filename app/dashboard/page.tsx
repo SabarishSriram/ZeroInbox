@@ -167,13 +167,13 @@ function DashboardPage() {
 
   return (
     <div
-      className={`min-h-screen bg-content font-sans${
+      className={`min-h-screen font-sans${
         showModal ? " filter blur-sm transition-all duration-300" : ""
       }`}
     >
       {/* Gmail Connection Modal using shadcn/ui Dialog */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className=" [&>button.absolute.right-4.top-4]:hidden w-[340px] rounded-2xl font-sans shadow-xl border-0 p-4">
+        <DialogContent className=" [&>button.absolute.right-4.top-4]:hidden w-[340px] rounded-2xl bg-content font-sans shadow-xl border-0 p-4">
           {isConnecting ? (
             <div className="flex flex-col items-center justify-center p-10 min-h-[220px]">
               <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent mb-4" />
