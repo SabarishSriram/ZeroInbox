@@ -12,6 +12,8 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import { EnvelopeOpenIcon, RectangleStackIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import Image from "next/image";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -207,7 +209,7 @@ function DashboardPage() {
                 <div className="w-full flex flex-col gap-4 mb-4">
                   <button
                     onClick={handleConnectGmail}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border- bg-white hover:bg-hovered text-foreground font-semibold text-base shadow-sm transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-border hover:bg-hovered text-foreground font-semibold text-base shadow-sm transition-colors"
                   >
                     <img
                       src="https://static.vecteezy.com/system/resources/previews/020/964/377/non_2x/gmail-mail-icon-for-web-design-free-png.png"
@@ -216,7 +218,7 @@ function DashboardPage() {
                     />
                     Connect Gmail account
                   </button>
-                  <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-border bg-white hover:bg-hovered text-foreground font-semibold text-base shadow-sm transition-colors">
+                  <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-border hover:bg-hovered text-foreground font-semibold text-base shadow-sm transition-colors">
                     <img
                       src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHhjp6s-vH8a-3pal9FKfqJfG992bdlw17vQ&s"
                       alt="Outlook"
@@ -227,20 +229,8 @@ function DashboardPage() {
                 </div>
                 {/* Privacy Note */}
                 <div className="w-full flex flex-col items-center mt-2 mb-2">
-                  <div className="flex items-center gap-1 mb-1">
-                    <svg
-                      className="h-4 w-4 text-primary"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 17a2 2 0 002-2V9a2 2 0 10-4 0v6a2 2 0 002 2zm0 0v2m0-2a6 6 0 100-12 6 6 0 000 12z"
-                      />
-                    </svg>
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    <ShieldCheckIcon className="w-4 h-4 text-muted-foreground" />
                     <span className="text-xs font-medium text-muted-foreground">
                       Privacy Protected
                     </span>
@@ -265,11 +255,13 @@ function DashboardPage() {
         </DialogContent>
       </Dialog>
       {/* Dashboard Content */}
-      <div className="container bg-white mx-auto px-4 py-8">
+      <div className="container bg-background mx-auto px-7 py-3">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back, {user.email}</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Home</h1>
+          <p className="text-muted-foreground">
+            Welcome back, {user.user_metadata.name}
+          </p>
         </div>
         {/* Stats Grid */}
         {gmailData && gmailData.length > 0 ? (
@@ -309,65 +301,56 @@ function DashboardPage() {
                 </p>
               </div>
             </div>
-            {/* Email Stats Table */}
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-border">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Email Statistics by Domain
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">
-                        Domain
-                      </th>
-                      <th className="text-left px-6 py-3 text-sm font-medium text-muted-foreground">
-                        Top Sender
-                      </th>
-                      <th className="text-right px-6 py-3 text-sm font-medium text-muted-foreground">
-                        Total Emails
-                      </th>
-                      <th className="text-right px-6 py-3 text-sm font-medium text-muted-foreground">
-                        Monthly Avg
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {gmailData.map((item: any, index: number) => (
-                      <tr
-                        key={index}
-                        className="hover:bg-muted/30 transition-colors"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                              <span className="text-xs font-medium text-primary">
-                                {item.domain.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <span className="font-medium text-foreground">
-                              {item.domain}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                          {item.sender_email}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
-                            {item.total_emails}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm text-muted-foreground">
-                          {item.monthly_avg}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+             <p className="font-semibold text-lg">Brands Reaching in your Inbox</p>
+            {/* Domain Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+             
+              {gmailData.map((item: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="bg-background shadow-md rounded-lg border-2 border-border p-4 flex flex-col items-center relative"
+                >
+                  <div className="flex flex-col items-center mb-2">
+                    <div className="w-12 h-12 flex items-center justify-center mb-2">
+                      <img
+                        src={`https://logo.clearbit.com/${item.domain}`}
+                        alt="Gmail"
+                        className="w-12 h-12 rounded-md"
+                        width={32}
+                        height={32}
+                      />
+                    </div>
+                    <div className="text-lg font-semibold text-foreground text-center">
+                      {item.domain}
+                    </div>
+                  </div>
+                  <div className="text-xs bg-muted text-muted-foreground rounded-full px-3 py-1 mb-2">
+                    @ {item.sender_count || 5} sender email address
+                  </div>
+                  <div className="flex items-center justify-center gap-4 mb-2">
+                    <div className="flex items-center gap-1">
+                      <EnvelopeOpenIcon className="w-5 h-5 text-muted-foreground" />
+                      <span className="font-semibold text-base text-foreground">
+                        {item.total_emails}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <RectangleStackIcon className="w-5 h-5 text-muted-foreground" />
+
+                      <span className="font-semibold text-base text-foreground">
+                        {item.monthly_avg}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        monthly
+                      </span>
+                    </div>
+                  </div>
+                  <button className="w-full mt-2 py-2 rounded-lg bg-foreground text-background font-semibold text-sm hover:bg-hovered transition"> 
+                 
+                    Take action
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         ) : (

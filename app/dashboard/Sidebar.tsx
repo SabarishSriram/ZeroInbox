@@ -1,5 +1,23 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import {
+  ChevronDownIcon,
+  ArrowRightOnRectangleIcon,
+  CreditCardIcon,
+  HomeIcon,
+  EnvelopeIcon,
+  DocumentIcon,
+  InboxArrowDownIcon,
+  FolderPlusIcon,
+} from "@heroicons/react/24/solid";
 import { usePathname } from "next/navigation";
 import { User, createClient } from "@supabase/supabase-js";
 import Image from "next/image";
@@ -22,9 +40,7 @@ const Sidebar = () => {
   }, []);
 
   return (
-    <aside
-      className="w-[270px] min-h-screen bg-white shadow-2xl z-20 flex flex-col justify-between font-sans"
-    >
+    <aside className="w-[270px] min-h-screen bg-sidebar shadow-lg z-20 flex flex-col justify-between font-sans">
       <div>
         {/* Top Section: Logo and Profile */}
         <div className="flex items-center justify-between px-4 py-3">
@@ -40,20 +56,61 @@ const Sidebar = () => {
           </div>
           <div className="flex items-center gap-2">
             {user?.user_metadata?.avatar_url ? (
-              <button className="p-1 rounded-full hover:bg-muted">
-                <Image
-                  src={user.user_metadata.avatar_url}
-                  alt="User avatar"
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-1 rounded-full hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring">
+                    <Image
+                      src={user.user_metadata.avatar_url}
+                      alt="User avatar"
+                      width={32}
+                      height={32}
+                      className="rounded-full"
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-64 rounded-xl shadow-xl border border-border bg-white p-0"
+                >
+                  <DropdownMenuLabel className="flex flex-col items-start px-4 pt-4 pb-2">
+                    <span className="font-semibold text-base text-foreground">
+                      {user.user_metadata?.name || "Name"}
+                    </span>
+                    <span className="text-xs text-muted-foreground break-all">
+                      {user.email || "name@gmail.com"}
+                    </span>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="flex items-center gap-2 px-4 py-2 cursor-pointer text-foreground hover:bg-muted">
+                    <CreditCardIcon className="w-5 h-5 text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">Billing</span>
+                      <span className="text-xs text-muted-foreground">
+                        Current plan: Free
+                      </span>
+                    </div>
+                    <span className="ml-auto text-xs underline text-primary cursor-pointer">
+                      Manage
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="flex items-center gap-2 px-4 py-2 cursor-pointer text-destructive hover:bg-destructive/10 font-medium"
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      window.location.href = "/auth";
+                    }}
+                  >
+                    <ArrowRightOnRectangleIcon className="w-5 h-5" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : null}
           </div>
         </div>
         {/* User Info */}
-        <div className="flex items-center mt-1 gap-2 border-2 px-2 py-2 mx-2 rounded-lg border-gray-400">
+        <div className="flex items-center mt-1 gap-2 border-2 px-2 py-2 mx-2 rounded-lg border-border hover:bg-hovered">
           <img
             src="https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_48dp.png"
             alt="Gmail"
@@ -68,19 +125,7 @@ const Sidebar = () => {
             </span>
           </div>
           <button className="ml-auto">
-            <svg
-              className="w-4 h-4 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
+            <ChevronDownIcon className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
         {/* Navigation */}
@@ -91,105 +136,43 @@ const Sidebar = () => {
                 href="/dashboard"
                 className={`flex items-center gap-2 py-2 px-2 rounded-lg text-foreground transition-colors ${
                   pathname === "/dashboard"
-                    ? "bg-gray-200 font-semibold"
+                    ? "bg-border font-semibold"
                     : "hover:bg-muted"
                 }`}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth="1.5"
-                  stroke="currentColor"
-                  className="size-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
-                  />
-                </svg>
+                <HomeIcon className="w-5 h-5 text-foreground" />
                 Home
               </a>
             </li>
             <li>
               <a
                 href="/subscriptions"
-                className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-muted text-foreground"
+                className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-hovered text-foreground"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
-                  className="size-6"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"
-                  />
-                </svg>
+                <EnvelopeIcon className="w-5 h-5 text-foreground" />
                 Subscriptions
               </a>
             </li>
+
             <li>
               <a
                 href="#"
-                className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-muted text-foreground"
+                className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-hovered text-foreground"
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <rect x="3" y="7" width="18" height="13" rx="2" />
-                  <path d="M16 3v4M8 3v4" />
-                </svg>
-                Rollup
-              </a>
-            </li>
-            <li>
-              <a
-                href="#"
-                className="flex items-center gap-2 py-2 px-2 rounded-lg hover:bg-muted text-foreground"
-              >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <rect x="3" y="7" width="18" height="13" rx="2" />
-                  <path d="M16 3v4M8 3v4" />
-                </svg>
+                <InboxArrowDownIcon className="w-5 h-5 text-foreground" />
                 Screener
               </a>
             </li>
           </ul>
         </nav>
         {/* Folders/Labels */}
-        <div className="px-4 py-2 border-t border-border">
+        <div className="px-4 py-2 border-">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-muted-foreground">
-              Folder / Label
+            <span className="text-md font-semibold text-muted-foreground">
+              Labels
             </span>
             <button className="p-1 rounded hover:bg-muted">
-              <svg
-                className="w-4 h-4 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
+              <FolderPlusIcon className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
           <ul className="space-y-1"></ul>

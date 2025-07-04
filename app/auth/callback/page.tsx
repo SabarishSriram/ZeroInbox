@@ -50,5 +50,9 @@ export default function AuthCallbackPage() {
     })();
   }, []);
 
-  return <p>Signing you in...</p>;
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white">
+      <span className="inline-block w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 }
