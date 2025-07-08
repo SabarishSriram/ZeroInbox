@@ -12,7 +12,11 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { EnvelopeOpenIcon, RectangleStackIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
+import {
+  EnvelopeOpenIcon,
+  RectangleStackIcon,
+  ShieldCheckIcon,
+} from "@heroicons/react/24/outline";
 import Image from "next/image";
 
 const supabase = createClient(
@@ -103,6 +107,8 @@ function DashboardPage() {
         },
         body: JSON.stringify({
           accessToken: accessToken,
+          userId: session?.session?.user?.id,
+          userEmail: session?.session?.user?.email,
         }),
       });
       if (!analyzeResponse.ok) {
@@ -112,7 +118,13 @@ function DashboardPage() {
       setConnectionProgress(70);
       setConnectionStatus("Fetching statistics...");
       // Step 2: Fetch stats
-      const statsResponse = await fetch("/api/email/stats", {
+      const userId = session?.session?.user?.id;
+      let statsUrl = "/api/email/stats";
+      if (userId) {
+        statsUrl += `?userId=${userId}`;
+      }
+
+      const statsResponse = await fetch(statsUrl, {
         method: "GET",
         credentials: "include",
       });
@@ -145,7 +157,16 @@ function DashboardPage() {
 
   const fetchEmailStats = async () => {
     try {
-      const statsResponse = await fetch("/api/email/stats", {
+      // Get the current session
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session?.session?.user?.id;
+
+      let url = "/api/email/stats";
+      if (userId) {
+        url += `?userId=${userId}`;
+      }
+
+      const statsResponse = await fetch(url, {
         method: "GET",
         credentials: "include",
       });
@@ -301,10 +322,11 @@ function DashboardPage() {
                 </p>
               </div>
             </div>
-             <p className="font-semibold text-lg">Brands Reaching in your Inbox</p>
+            <p className="font-semibold text-lg">
+              Brands Reaching in your Inbox
+            </p>
             {/* Domain Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-             
               {gmailData.map((item: any, idx: number) => (
                 <div
                   key={idx}
@@ -345,8 +367,7 @@ function DashboardPage() {
                       </span>
                     </div>
                   </div>
-                  <button className="w-full mt-2 py-2 rounded-lg bg-foreground text-background font-semibold text-sm hover:bg-hovered transition"> 
-                 
+                  <button className="w-full mt-2 py-2 rounded-lg bg-foreground text-background font-semibold text-sm hover:bg-hovered transition">
                     Take action
                   </button>
                 </div>
@@ -357,19 +378,11 @@ function DashboardPage() {
           !showModal && (
             <div className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                <svg
-                  className="w-8 h-8 text-muted-foreground"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z"
-                  />
-                </svg>
+                <img
+                  src="https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_48dp.png"
+                  alt="Gmail"
+                  className="w-10 h-10"
+                />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
                 No Gmail Data

@@ -1,12 +1,7 @@
 import React from "react";
 
-import Sidebar from "./Sidebar";
+import Sidebar from "../../components/Sidebar";
 import { createClient, User } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default async function DashboardLayout({
   children,
@@ -15,9 +10,11 @@ export default async function DashboardLayout({
 }) {
   // Fetch user session (SSR)
   return (
-    <div className="flex min-h-screen bg-white">
-      <Sidebar/>
-      <main className="flex-1 bg-white">{children}</main>
+    <div className="min-h-screen bg-white">
+      <Sidebar />
+      <main className="ml-[270px] min-h-screen bg-white overflow-y-auto">
+        {children}
+      </main>
     </div>
   );
 }
