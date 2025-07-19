@@ -1,46 +1,68 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 import {
-  ChevronDownIcon,
-  MagnifyingGlassIcon,
-} from "@heroicons/react/24/outline";
-import {
-  EnvelopeIcon,
-  CalendarIcon,
-  ClockIcon,
-} from "@heroicons/react/24/solid";
-import Image from "next/image";
+  TabNavigation,
+  SearchAndControls,
+  UnsubscribeDialog,
+  SubscriptionItem,
+  UnsubscribedItem,
+  SafeItem,
+  EmptyState,
+  EmailStats,
+  UnsubscribedSender,
+  SafeSender,
+} from "@/components/subscriptions";
 
-interface EmailStats {
-  domain: string;
-  sender_count: number;
-  total_emails: number;
-  monthly_avg: number;
-  recent_emails?: number;
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  }
+);
 
 function SubscriptionsPage() {
   const [emailData, setEmailData] = useState<EmailStats[]>([]);
+  const [unsubscribedSenders, setUnsubscribedSenders] = useState<
+    UnsubscribedSender[]
+  >([]);
+  const [safeSenders, setSafeSenders] = useState<SafeSender[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState("Inbox");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("Recent");
   const [filterBy, setFilterBy] = useState("All");
+  const [unsubscribeDialogOpen, setUnsubscribeDialogOpen] = useState(false);
+  const [unsubscribeTarget, setUnsubscribeTarget] = useState<EmailStats | null>(
+    null
+  );
 
   useEffect(() => {
-    fetchEmailStats();
+    const checkAuthAndFetchData = async () => {
+      const { data: session } = await supabase.auth.getSession();
+
+      if (!session?.session?.user) {
+        // Redirect to auth page if no session
+        window.location.href = "/auth";
+        return;
+      }
+
+      fetchEmailStats();
+      fetchUnsubscribedSenders();
+      fetchSafeSenders();
+    };
+
+    checkAuthAndFetchData();
   }, []);
 
   const fetchEmailStats = async () => {
     try {
-      // Import Supabase client and get user ID
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-      );
-
       const { data: session } = await supabase.auth.getSession();
       const userId = session?.session?.user?.id;
 
@@ -64,7 +86,72 @@ function SubscriptionsPage() {
     }
   };
 
+  const fetchUnsubscribedSenders = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const userId = session?.session?.user?.id;
+
+      let url = "/api/unsubscribed-senders";
+      if (userId) {
+        url += `?userId=${userId}`;
+      }
+
+      const response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUnsubscribedSenders(data.senders || []);
+      }
+    } catch (error) {
+      console.error("Error fetching unsubscribed senders:", error);
+    }
+  };
+
+  const fetchSafeSenders = async () => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+
+      if (!session?.session?.user) {
+        console.error("No valid session found");
+        return;
+      }
+
+      const response = await fetch("/api/safe-senders", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSafeSenders(data.senders || []);
+      } else {
+        console.error(
+          "Failed to fetch safe senders:",
+          response.status,
+          response.statusText
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching safe senders:", error);
+    }
+  };
+
   const filteredData = emailData.filter((item) =>
+    item.domain.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredUnsubscribed = unsubscribedSenders.filter((item) =>
+    item.sender.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredSafe = safeSenders.filter((item) =>
     item.domain.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -84,7 +171,233 @@ function SubscriptionsPage() {
     }
   });
 
+  const sortedUnsubscribed = [...filteredUnsubscribed].sort((a, b) => {
+    switch (sortBy) {
+      case "Recent":
+        return (
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+      default:
+        return (
+          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        );
+    }
+  });
+
+  const sortedSafe = [...filteredSafe].sort((a, b) => {
+    // Sort by most recently marked safe
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   const tabs = ["Inbox", "Marked Safe", "Unsubscribed"];
+
+  // Handler for Unsubscribe button
+  const handleUnsubscribeClick = (item: EmailStats) => {
+    setUnsubscribeTarget(item);
+    setUnsubscribeDialogOpen(true);
+  };
+
+  // Handler for dialog actions
+  const handleUnsubscribeAction = async (action: "archive" | "delete") => {
+    if (!unsubscribeTarget) return;
+    setUnsubscribeDialogOpen(false);
+    const apiAction = action === "archive" ? "trash" : "delete";
+    try {
+      // Get the current session and access token
+      const { data: session } = await supabase.auth.getSession();
+      const accessToken = session?.session?.provider_token;
+      const userId = session?.session?.user?.id;
+
+      if (!accessToken) {
+        throw new Error("No access token available. Please sign in again.");
+      }
+
+      // 1. Call /api/unsubscribe
+      const unsubUrl = `/api/unsubscribe?userId=${userId}`;
+      const unsubRes = await fetch(unsubUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          target: unsubscribeTarget.domain,
+          action: apiAction,
+          accessToken: accessToken,
+          userId: userId,
+        }),
+      });
+      const unsubData = await unsubRes.json();
+
+      // 2. Call /api/gmail-filters
+      const filtersUrl = `/api/gmail-filters?userId=${userId}`;
+      await fetch(filtersUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          accessToken: accessToken,
+          userId: userId,
+          target: unsubscribeTarget.domain,
+          action: apiAction,
+        }),
+      });
+
+      setTimeout(() => {
+        alert(
+          `Unsubscribed from ${unsubscribeTarget.domain} and ${
+            action === "archive" ? "archived" : "deleted"
+          } emails!`
+        );
+        // Refresh the data after successful unsubscribe
+        fetchEmailStats();
+        fetchUnsubscribedSenders();
+      }, 300);
+    } catch (err) {
+      alert("Unsubscribe failed: " + (err as Error).message);
+    }
+  };
+
+  // Handler for resubscribe action
+  const handleResubscribe = async (sender: string) => {
+    try {
+      const { data: session, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError || !session?.session?.user) {
+        throw new Error("No valid session found. Please sign in again.");
+      }
+
+      const userId = session.session.user.id;
+      const accessToken = session.session.provider_token;
+
+      if (!accessToken) {
+        throw new Error("No access token available. Please sign in again.");
+      }
+
+      // Call resubscribe API
+      const response = await fetch(`/api/resubscribe?userId=${userId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          sender: sender,
+          accessToken: accessToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          `Resubscribe failed: ${errorData.error || "Unknown error"}`
+        );
+      }
+
+      const result = await response.json();
+      console.log("Resubscribe result:", result);
+
+      // Show success message with email count
+      const message =
+        result.emailsRestored > 0
+          ? `Successfully resubscribed to ${sender} and moved ${result.emailsRestored} emails from trash to inbox.`
+          : `Successfully resubscribed to ${sender}.`;
+      alert(message);
+
+      // Refresh data to show the sender back in the inbox
+      await Promise.all([fetchEmailStats(), fetchUnsubscribedSenders()]);
+    } catch (error: any) {
+      console.error("Resubscribe failed:", error);
+      alert(`Resubscribe failed: ${error.message}`);
+    }
+  };
+
+  // Handler for Keep/Mark Safe action
+  const handleKeepClick = async (item: EmailStats) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+
+      if (!session?.session?.user) {
+        throw new Error("No user session found. Please sign in.");
+      }
+
+      const response = await fetch("/api/mark-safe", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domain: item.domain,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log("Marked as safe successfully:", result);
+        alert(`Successfully marked ${item.domain} as safe!`);
+
+        // Remove the item from emailStats and refresh data
+        await Promise.all([fetchEmailStats(), fetchSafeSenders()]);
+        setSelectedTab("Marked Safe");
+      } else {
+        console.error("Error marking as safe:", result);
+        alert(`Failed to mark as safe: ${result.error || "Unknown error"}`);
+      }
+    } catch (error: any) {
+      console.error("Error during mark safe:", error);
+      alert(`Error marking as safe: ${error.message}`);
+    }
+  };
+
+  // Handler for removing domain from safe senders
+  const handleUnmarkSafe = async (domain: string) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+
+      if (!session?.session?.user) {
+        throw new Error("No user session found. Please sign in.");
+      }
+
+      const response = await fetch("/api/unmark-safe", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          domain: domain,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log("Unmarked safe successfully:", result);
+        alert(`Successfully removed ${domain} from safe list!`);
+
+        // Refresh safe senders data
+        await fetchSafeSenders();
+      } else {
+        console.error("Error unmarking safe:", result);
+        alert(
+          `Failed to remove from safe list: ${result.error || "Unknown error"}`
+        );
+      }
+    } catch (error: any) {
+      console.error("Error during unmark safe:", error);
+      alert(`Error removing from safe list: ${error.message}`);
+    }
+  };
 
   if (loading) {
     return (
@@ -106,176 +419,79 @@ function SubscriptionsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 mb-6 border-b border-border">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setSelectedTab(tab)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              selectedTab === tab
-                ? "text-foreground border-b-2 border-primary"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+      <TabNavigation
+        tabs={tabs}
+        selectedTab={selectedTab}
+        onTabChange={setSelectedTab}
+      />
 
       {/* Search and Controls */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search Senders"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-1 border border-border rounded-md bg-white text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          />
-        </div>
+      <SearchAndControls
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+        filterBy={filterBy}
+        onFilterChange={setFilterBy}
+      />
 
-        {/* Filter and Sort */}
-        <div className="flex items-center gap-3">
-          {/* Filter Dropdown */}
-          <div className="relative">
-            <select
-              value={filterBy}
-              onChange={(e) => setFilterBy(e.target.value)}
-              className="appearance-none bg-white border border-border rounded-md px-4 py-1 pr-8 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="All">Filter</option>
-              <option value="High Volume">High Volume</option>
-              <option value="Low Volume">Low Volume</option>
-            </select>
-            <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          </div>
+      {/* Unsubscribe Dialog */}
+      <UnsubscribeDialog
+        isOpen={unsubscribeDialogOpen}
+        onOpenChange={setUnsubscribeDialogOpen}
+        target={unsubscribeTarget}
+        onUnsubscribeAction={handleUnsubscribeAction}
+      />
 
-          {/* Sort Dropdown */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="appearance-none bg-white border border-border rounded-md px-4 py-1 pr-8 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="Recent">Sort - Recent</option>
-              <option value="Email count">Email count</option>
-              <option value="Monthly count">Monthly count</option>
-            </select>
-            <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          </div>
-
-          {/* Sort Direction */}
-          <button className="p-1 border border-border rounded-sm hover:bg-hovered transition-colors">
-            <svg
-              className="w-4 h-4 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-              />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Subscriptions List */}
+      {/* Content List */}
       <div className="space-y-3">
-        {sortedData.length > 0 ? (
-          sortedData.map((item, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-4 p-3  bg-white border border-border rounded-xl hover:bg-hovered/50 transition-colors"
-            >
-              {/* Checkbox */}
-              <input
-                type="checkbox"
-                className="w-4 h-4 text-primary border-border rounded focus:ring-primary focus:ring-2"
-              />
+        {selectedTab === "Inbox" && (
+          <>
+            {sortedData.length > 0 ? (
+              sortedData.map((item, index) => (
+                <SubscriptionItem
+                  key={index}
+                  item={item}
+                  onUnsubscribeClick={handleUnsubscribeClick}
+                  onKeepClick={handleKeepClick}
+                />
+              ))
+            ) : (
+              <EmptyState type="inbox" searchTerm={searchTerm} />
+            )}
+          </>
+        )}
 
-              {/* Logo */}
+        {selectedTab === "Unsubscribed" && (
+          <>
+            {sortedUnsubscribed.length > 0 ? (
+              sortedUnsubscribed.map((item, index) => (
+                <UnsubscribedItem
+                  key={index}
+                  item={item}
+                  onResubscribe={handleResubscribe}
+                />
+              ))
+            ) : (
+              <EmptyState type="unsubscribed" searchTerm={searchTerm} />
+            )}
+          </>
+        )}
 
-              <Image
-                src={`https://logo.clearbit.com/${item.domain}`}
-                alt={item.domain}
-                width={32}
-                height={32}
-                className="w-8 h-8 object-contain"
-              />
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground text-base">
-                      {item.domain.charAt(0).toUpperCase() +
-                        item.domain.slice(1)}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      email@{item.domain}
-                    </p>
-
-                    {/* Stats */}
-                    <div className="flex items-center gap-6 text-sm">
-                      <div className="flex items-center gap-1">
-                        <EnvelopeIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">
-                          {item.total_emails}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">
-                          {item.monthly_avg} monthly
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <ClockIcon className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">20h ago</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tags and Actions */}
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded">
-                      Recent Emails
-                    </span>
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-1">
-                      <button className="px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded hover:bg-primary/90 transition-colors">
-                        ✓ Keep
-                      </button>
-                      <button className="px-3 py-1 bg-destructive/10 text-destructive text-xs font-medium rounded hover:bg-destructive/20 transition-colors">
-                        Unsubscribe
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-12">
-            <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-              <EnvelopeIcon className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              No Subscriptions Found
-            </h3>
-            <p className="text-muted-foreground">
-              {searchTerm
-                ? "Try adjusting your search terms."
-                : "Connect your email account to see subscriptions."}
-            </p>
-          </div>
+        {selectedTab === "Marked Safe" && (
+          <>
+            {sortedSafe.length > 0 ? (
+              sortedSafe.map((item, index) => (
+                <SafeItem
+                  key={index}
+                  item={item}
+                  onUnmarkSafe={handleUnmarkSafe}
+                />
+              ))
+            ) : (
+              <EmptyState type="safe" />
+            )}
+          </>
         )}
       </div>
     </div>
