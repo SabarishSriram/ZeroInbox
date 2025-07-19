@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       .map((msg) => ({ id: msg.id as string }));
     allMessages.push(...messages);
     nextPageToken = res.data.nextPageToken || null;
-  } while (nextPageToken && allMessages.length < 1000);
+  } while (nextPageToken);
 
   // Fetch message details for demo
   if (returnEmails) {
