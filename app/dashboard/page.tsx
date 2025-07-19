@@ -4,20 +4,10 @@ import React, { useEffect, useState } from "react";
 import { createClient, User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  EnvelopeOpenIcon,
-  RectangleStackIcon,
-  ShieldCheckIcon,
-} from "@heroicons/react/24/outline";
-import Image from "next/image";
+  GmailConnectionModal,
+  DashboardContent,
+  EmailStats,
+} from "@/components/dashboard";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,7 +23,7 @@ const supabase = createClient(
 
 function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [gmailData, setGmailData] = useState<any[]>([]);
+  const [gmailData, setGmailData] = useState<EmailStats[]>([]);
   const [checked, setChecked] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -194,212 +184,24 @@ function DashboardPage() {
         showModal ? " filter blur-sm transition-all duration-300" : ""
       }`}
     >
-      {/* Gmail Connection Modal using shadcn/ui Dialog */}
-      <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className=" [&>button.absolute.right-4.top-4]:hidden w-[340px] rounded-2xl bg-content font-sans shadow-xl border-0 p-4">
-          {isConnecting ? (
-            <div className="flex flex-col items-center justify-center p-10 min-h-[220px]">
-              <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent mb-4" />
-              <span className="text-base text-black font-medium">
-                {connectionStatus || "Connecting to Gmail..."}
-              </span>
-            </div>
-          ) : (
-            <>
-              {/* Blue progress bar with padding */}
-              <div className="w-full pt-2 pb-2">
-                <div className="h-1 w-full bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-1 transition-all duration-300 bg-[--primary-blue] rounded-full"
-                    style={{
-                      width: isConnecting ? `${connectionProgress}%` : "100%",
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="py-2 px-6 flex flex-col items-center font-sans">
-                <DialogHeader className="w-full">
-                  <DialogTitle className="text-xl font-bold text-center mb-1">
-                    Connect an email account
-                  </DialogTitle>
-                  <DialogDescription className="text-center text-muted-foreground mb-4">
-                    Connect an account to start cleaning
-                  </DialogDescription>
-                </DialogHeader>
-                {/* Provider Buttons */}
-                <div className="w-full flex flex-col gap-4 mb-4">
-                  <button
-                    onClick={handleConnectGmail}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-border hover:bg-hovered text-foreground font-semibold text-base shadow-sm transition-colors"
-                  >
-                    <img
-                      src="https://static.vecteezy.com/system/resources/previews/020/964/377/non_2x/gmail-mail-icon-for-web-design-free-png.png"
-                      alt="Gmail"
-                      className="h-6 w-6"
-                    />
-                    Connect Gmail account
-                  </button>
-                  <button className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-border hover:bg-hovered text-foreground font-semibold text-base shadow-sm transition-colors">
-                    <img
-                      src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTHhjp6s-vH8a-3pal9FKfqJfG992bdlw17vQ&s"
-                      alt="Outlook"
-                      className="h-6 w-6"
-                    />
-                    Connect Outlook account
-                  </button>
-                </div>
-                {/* Privacy Note */}
-                <div className="w-full flex flex-col items-center mt-2 mb-2">
-                  <div className="flex items-center justify-center gap-1 mb-1">
-                    <ShieldCheckIcon className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Privacy Protected
-                    </span>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center max-w-xs">
-                    Please note, we need additional access to your email
-                    account. We only access absolutely required data and store
-                    it in secure storage. We do not see or share your email
-                    data.
-                  </p>
-                </div>
-                <DialogFooter className="w-full mt-2">
-                  <DialogClose asChild>
-                    <button className="w-full text-sm text-muted-foreground underline hover:text-primary mt-2">
-                      Close
-                    </button>
-                  </DialogClose>
-                </DialogFooter>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-      {/* Dashboard Content */}
-      <div className="container bg-background mx-auto px-7 py-3">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Home</h1>
-          <p className="text-muted-foreground">
-            Welcome back, {user.user_metadata.name}
-          </p>
-        </div>
-        {/* Stats Grid */}
-        {gmailData && gmailData.length > 0 ? (
-          <div className="space-y-6">
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-card border border-border rounded-xl p-6">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  Total Domains
-                </h3>
-                <p className="text-2xl font-bold text-foreground">
-                  {gmailData.length}
-                </p>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-6">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  Total Emails
-                </h3>
-                <p className="text-2xl font-bold text-foreground">
-                  {gmailData.reduce(
-                    (sum: number, item: any) => sum + item.total_emails,
-                    0
-                  )}
-                </p>
-              </div>
-              <div className="bg-card border border-border rounded-xl p-6">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  Avg. Monthly
-                </h3>
-                <p className="text-2xl font-bold text-foreground">
-                  {(
-                    gmailData.reduce(
-                      (sum: number, item: any) => sum + item.monthly_avg,
-                      0
-                    ) / gmailData.length
-                  ).toFixed(1)}
-                </p>
-              </div>
-            </div>
-            <p className="font-semibold text-lg">
-              Brands Reaching in your Inbox
-            </p>
-            {/* Domain Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {gmailData.map((item: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="bg-background shadow-md rounded-lg border-2 border-border p-4 flex flex-col items-center relative"
-                >
-                  <div className="flex flex-col items-center mb-2">
-                    <div className="w-12 h-12 flex items-center justify-center mb-2">
-                      <img
-                        src={`https://logo.clearbit.com/${item.domain}`}
-                        alt="Gmail"
-                        className="w-12 h-12 rounded-md"
-                        width={32}
-                        height={32}
-                      />
-                    </div>
-                    <div className="text-lg font-semibold text-foreground text-center">
-                      {item.domain}
-                    </div>
-                  </div>
-                  <div className="text-xs bg-muted text-muted-foreground rounded-full px-3 py-1 mb-2">
-                    @ {item.sender_count || 5} sender email address
-                  </div>
-                  <div className="flex items-center justify-center gap-4 mb-2">
-                    <div className="flex items-center gap-1">
-                      <EnvelopeOpenIcon className="w-5 h-5 text-muted-foreground" />
-                      <span className="font-semibold text-base text-foreground">
-                        {item.total_emails}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <RectangleStackIcon className="w-5 h-5 text-muted-foreground" />
+      {/* Gmail Connection Modal */}
+      <GmailConnectionModal
+        isOpen={showModal}
+        onOpenChange={setShowModal}
+        isConnecting={isConnecting}
+        connectionStatus={connectionStatus}
+        connectionProgress={connectionProgress}
+        onConnectGmail={handleConnectGmail}
+      />
 
-                      <span className="font-semibold text-base text-foreground">
-                        {item.monthly_avg}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        monthly
-                      </span>
-                    </div>
-                  </div>
-                  <button className="w-full mt-2 py-2 rounded-lg bg-foreground text-background font-semibold text-sm hover:bg-hovered transition">
-                    Take action
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          !showModal && (
-            <div className="text-center py-12">
-              <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
-                <img
-                  src="https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_48dp.png"
-                  alt="Gmail"
-                  className="w-10 h-10"
-                />
-              </div>
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                No Gmail Data
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                Connect your Gmail account to see your email statistics.
-              </p>
-              <button
-                onClick={() => setShowModal(true)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-lg font-medium transition-colors"
-              >
-                Connect Gmail
-              </button>
-            </div>
-          )
-        )}
-      </div>
+      {/* Dashboard Content */}
+      {!showModal && (
+        <DashboardContent
+          user={user}
+          gmailData={gmailData}
+          onShowModal={() => setShowModal(true)}
+        />
+      )}
     </div>
   );
 }
