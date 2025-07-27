@@ -1,54 +1,122 @@
 import { google } from "googleapis";
-import { createClient, Session, User } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl!, supabaseKey!);
-
-async function getGmailClientFromSession() {
-  const { data: sessionData, error } = await supabase.auth.getSession();
-  const session = sessionData.session as Session;
-  if (error || !session?.provider_token) {
-    throw new Error("Failed to retrieve Google access token from session");
-  }
-
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: session.provider_token });
-  return google.gmail({ version: "v1", auth });
-}
-
-async function storeLabelsInSupabase(labels: any[], userId: string) {
-  const formattedLabels = labels.map((label) => ({
-    id: label.id,
-    name: label.name,
-    user_id: userId,
-  }));
-
-  const { error } = await supabase.from("gmail_labels").upsert(formattedLabels);
-  if (error) {
-    throw new Error(`Failed to store labels in Supabase: ${error.message}`);
-  }
-}
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
-    const gmail = await getGmailClientFromSession();
+    console.log("[GMAIL LABELS API] GET called");
+
+    // --- AUTHENTICATION & USER CONTEXT ---
+    const supabase = await createClient();
+    let userId: string;
+    let accessToken: string;
+
+    // Get the session from Supabase (cookies-based session for OAuth provider tokens)
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
+    console.log(
+      "[GMAIL LABELS API] sessionData:",
+      sessionData?.session?.user?.id
+    );
+    console.log("[GMAIL LABELS API] sessionError:", sessionError);
+
+    if (sessionError || !sessionData?.session?.user) {
+      console.error("[GMAIL LABELS API] No valid session found");
+      return Response.json(
+        { 
+          error: "Authentication required. Please sign in with Google.",
+          code: "SESSION_REQUIRED",
+          action: "SIGNIN_GOOGLE"
+        },
+        { status: 401 }
+      );
+    }
+
+    userId = sessionData.session.user.id;
+    
+    // Get access token for Gmail API from session
+    const providerToken = sessionData.session.provider_token;
+    if (!providerToken) {
+      console.error("[GMAIL LABELS API] No Gmail OAuth token found in session");
+      return Response.json(
+        {
+          error: "Gmail access token not found. Please reconnect your Google account.",
+          code: "TOKEN_MISSING",
+          action: "RECONNECT_GMAIL"
+        },
+        { status: 401 }
+      );
+    }
+    
+    accessToken = providerToken;
+
+    // Set up Gmail API client
+    const auth = new google.auth.OAuth2();
+    auth.setCredentials({ access_token: accessToken });
+    const gmail = google.gmail({ version: "v1", auth });
+
+    // Fetch labels from Gmail
+    console.log("[GMAIL LABELS API] Fetching labels from Gmail...");
     const labelsResponse = await gmail.users.labels.list({ userId: "me" });
     const labels = labelsResponse.data.labels || [];
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    const user = userData.user as User;
-    if (userError || !user?.id) {
-      throw new Error("Failed to retrieve user information");
-    }
+    console.log("[GMAIL LABELS API] Found", labels.length, "labels");
 
-    await storeLabelsInSupabase(labels, user.id);
+    // Store labels in Supabase
+    await storeLabelsInSupabase(labels, userId, supabase);
 
-    return Response.json({ success: true, labels });
+    return Response.json({
+      success: true,
+      labels: labels,
+      count: labels.length,
+    });
   } catch (err: any) {
+    console.error("[GMAIL LABELS API] Error:", err);
     return Response.json(
       { error: err.message || err.toString() },
       { status: 500 }
     );
+  }
+}
+
+async function storeLabelsInSupabase(
+  labels: any[],
+  userId: string,
+  supabase: any
+) {
+  try {
+    const formattedLabels = labels.map((label) => ({
+      label_id: label.id,
+      name: label.name,
+      user_id: userId,
+      type: label.type || "user",
+      messages_total: label.messagesTotal || 0,
+      messages_unread: label.messagesUnread || 0,
+      threads_total: label.threadsTotal || 0,
+      threads_unread: label.threadsUnread || 0,
+    }));
+
+    console.log(
+      "[GMAIL LABELS API] Storing",
+      formattedLabels.length,
+      "labels in database"
+    );
+
+    const { error } = await supabase
+      .from("gmail_labels")
+      .upsert(formattedLabels, {
+        onConflict: "label_id,user_id",
+        ignoreDuplicates: false,
+      });
+
+    if (error) {
+      console.error("[GMAIL LABELS API] Failed to store labels:", error);
+      throw new Error(`Failed to store labels in database: ${error.message}`);
+    } else {
+      console.log("[GMAIL LABELS API] Successfully stored labels in database");
+    }
+  } catch (error) {
+    console.error("[GMAIL LABELS API] Error storing labels:", error);
+    throw error;
   }
 }
