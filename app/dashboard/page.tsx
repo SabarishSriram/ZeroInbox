@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { createClient, User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import {
@@ -21,7 +21,7 @@ const supabase = createClient(
   }
 );
 
-function DashboardPage() {
+function DashboardPageContent() {
   const [user, setUser] = useState<User | null>(null);
   const [gmailData, setGmailData] = useState<EmailStats[]>([]);
   const [checked, setChecked] = useState(false);
@@ -29,6 +29,7 @@ function DashboardPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("");
   const [connectionProgress, setConnectionProgress] = useState(0);
+
   const router = useRouter();
 
   // Check if user has already connected Gmail
@@ -172,9 +173,9 @@ function DashboardPage() {
   if (!checked) return null;
   if (!user) {
     return (
-      <div className="min-h-screen bg-content flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
+      <div className="flex min-h-screen items-center justify-center bg-white">
+      <span className="inline-block w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin" />
+    </div>
     );
   }
 
@@ -203,6 +204,20 @@ function DashboardPage() {
         />
       )}
     </div>
+  );
+}
+
+function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-content flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      }
+    >
+      <DashboardPageContent />
+    </Suspense>
   );
 }
 

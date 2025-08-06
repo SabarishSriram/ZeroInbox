@@ -14,19 +14,19 @@ const OverviewCards: React.FC<OverviewCardsProps> = ({ gmailData }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card hover:shadow-md border border-border rounded-xl p-6">
         <h3 className="text-sm font-medium text-muted-foreground mb-2">
           Total Domains
         </h3>
         <p className="text-2xl font-bold text-foreground">{gmailData.length}</p>
       </div>
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card hover:shadow-md border border-border rounded-xl p-6">
         <h3 className="text-sm font-medium text-muted-foreground mb-2">
           Total Emails
         </h3>
         <p className="text-2xl font-bold text-foreground">{totalEmails}</p>
       </div>
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card hover:shadow-md border border-border rounded-xl p-6">
         <h3 className="text-sm font-medium text-muted-foreground mb-2">
           This Month
         </h3>
