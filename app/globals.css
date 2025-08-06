@@ -45,9 +45,9 @@
     --error: #ff0000;
 
     /* Highlight Colors */
-    --highlight-selection-bg: #FFF9D9;
+    --highlight-selection-bg: #fff9d9;
     --highlight-confirmed-bg: rgba(255, 229, 100, 0.4);
-    --highlight-confirmed-underline: #FFD400;
+    --highlight-confirmed-underline: #ffd400;
   }
 
   .dark {
@@ -75,9 +75,9 @@
     --content: #191919;
     --hovered: #333333;
 
-    --highlight-selection-bg: #38381E;
+    --highlight-selection-bg: #38381e;
     --highlight-confirmed-bg: rgba(208, 176, 7, 0.3);
-    --highlight-confirmed-underline: #D0B007;
+    --highlight-confirmed-underline: #d0b007;
   }
 
   * {
@@ -123,7 +123,8 @@
 .bookmark-highlight {
   cursor: pointer;
 }
-.bookmark-highlight, .bookmark-highlight * {
+.bookmark-highlight,
+.bookmark-highlight * {
   color: inherit !important;
 }
 
@@ -144,7 +145,7 @@
   color: #666457;
 }
 .dark .rw-highlight-note-icon {
-  color: #AFAFA5;
+  color: #afafa5;
 }
 
 @theme inline {
@@ -186,4 +187,28 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* Line Clamp Utilities */
+@layer utilities {
+  .line-clamp-1 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+  }
+
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .line-clamp-3 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
 }
