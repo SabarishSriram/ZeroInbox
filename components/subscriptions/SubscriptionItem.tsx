@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { CheckCircleIcon, TrashIcon } from "@heroicons/react/24/outline";
 import {
   EnvelopeIcon,
@@ -7,19 +7,53 @@ import {
 } from "@heroicons/react/24/solid";
 import Image from "next/image";
 import { SubscriptionItemProps } from "./types";
+import { RecentEmailsDialog } from "./RecentEmailsDialog";
 
 const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
   item,
   onUnsubscribeClick,
   onKeepClick,
+  onMoveToLabelClick,
+  isSelected,
+  onSelectionChange,
 }) => {
+  const [showRecentEmails, setShowRecentEmails] = useState(false);
+
   return (
     <div className="flex items-center gap-4 p-3 bg-white border border-border rounded-xl hover:bg-hovered/50 transition-colors">
       {/* Checkbox */}
-      <input
-        type="checkbox"
-        className="w-4 h-4 text-primary border-border rounded focus:ring-primary focus:ring-2"
-      />
+      <div className="relative">
+        <input
+          type="checkbox"
+          checked={isSelected || false}
+          onChange={(e) => onSelectionChange?.(item, e.target.checked)}
+          className="sr-only"
+        />
+        <div
+          onClick={() => onSelectionChange?.(item, !isSelected)}
+          className={`w-5 h-5 rounded border-2 cursor-pointer transition-all duration-200 flex items-center justify-center ${
+            isSelected
+              ? "bg-black border-black"
+              : "bg-white border-gray-300 hover:border-gray-400"
+          }`}
+        >
+          {isSelected && (
+            <svg
+              className="w-3 h-3 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          )}
+        </div>
+      </div>
 
       {/* Logo */}
       <Image
@@ -64,9 +98,12 @@ const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
 
           {/* Tags and Actions */}
           <div className="flex items-center gap-3">
-            <span className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded">
+            <button
+              onClick={() => setShowRecentEmails(true)}
+              className="px-2 py-1 bg-primary/10 text-primary text-xs font-medium rounded hover:bg-primary/20 transition-colors cursor-pointer"
+            >
               Recent Emails
-            </span>
+            </button>
 
             {/* Action Buttons */}
             <div className="flex items-center gap-1">
@@ -88,6 +125,14 @@ const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Recent Emails Dialog */}
+      <RecentEmailsDialog
+        isOpen={showRecentEmails}
+        onClose={() => setShowRecentEmails(false)}
+        domain={item.domain}
+        emailStats={item}
+      />
     </div>
   );
 };

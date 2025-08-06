@@ -3,6 +3,13 @@ import {
   ChevronDownIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SearchAndControlsProps } from "./types";
 
 const SearchAndControls: React.FC<SearchAndControlsProps> = ({
@@ -12,6 +19,7 @@ const SearchAndControls: React.FC<SearchAndControlsProps> = ({
   onSortChange,
   filterBy,
   onFilterChange,
+  gmailLabels = [],
 }) => {
   return (
     <div className="flex items-center justify-between gap-4 mb-6">
@@ -21,7 +29,7 @@ const SearchAndControls: React.FC<SearchAndControlsProps> = ({
         <input
           type="text"
           placeholder="Search Senders"
-          value={searchTerm}
+          value={searchTerm}  
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-10 pr-4 py-1 border border-border rounded-md bg-white text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
         />
@@ -29,50 +37,81 @@ const SearchAndControls: React.FC<SearchAndControlsProps> = ({
 
       {/* Filter and Sort */}
       <div className="flex items-center gap-3">
-        {/* Filter Dropdown */}
-        <div className="relative">
-          <select
-            value={filterBy}
-            onChange={(e) => onFilterChange(e.target.value)}
-            className="appearance-none bg-white border border-border rounded-md px-4 py-1 pr-8 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            <option value="All">Filter</option>
-            <option value="High Volume">High Volume</option>
-            <option value="Low Volume">Low Volume</option>
-          </select>
-          <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        </div>
+        {/* Filter Dropdown - Labels */}
+        <Select value={filterBy} onValueChange={onFilterChange}>
+          <SelectTrigger className="w-[180px] focus:outline-none focus:ring-0 focus:border-border focus-visible:ring-0 focus-visible:outline-none">
+            <SelectValue placeholder="Filter by label..." />
+          </SelectTrigger>
+          <SelectContent className="font-sans">
+            <SelectItem 
+              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
+              value="All"
+              style={{ 
+                border: 'none !important',
+                outline: 'none !important',
+                boxShadow: 'none !important'
+              }}
+            >
+              All
+            </SelectItem>
+            <SelectItem 
+              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
+              value="Inbox"
+              style={{ 
+                border: 'none !important',
+                outline: 'none !important',
+                boxShadow: 'none !important'
+              }}
+            >
+              Inbox
+            </SelectItem>
+            {gmailLabels.map((label) => (
+              <SelectItem 
+                key={label.id}
+                className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
+                value={label.id}
+                style={{ 
+                  border: 'none !important',
+                  outline: 'none !important',
+                  boxShadow: 'none !important'
+                }}
+              >
+                {label.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {/* Sort Dropdown */}
-        <div className="relative">
-          <select
-            value={sortBy}
-            onChange={(e) => onSortChange(e.target.value)}
-            className="appearance-none bg-white border border-border rounded-md px-4 py-1 pr-8 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            <option value="Recent">Sort - Recent</option>
-            <option value="Email count">Email count</option>
-            <option value="Monthly count">Monthly count</option>
-          </select>
-          <ChevronDownIcon className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        </div>
-
-        {/* Sort Direction */}
-        <button className="p-1 border border-border rounded-sm hover:bg-hovered transition-colors">
-          <svg
-            className="w-4 h-4 text-muted-foreground"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"
-            />
-          </svg>
-        </button>
+        <Select value={sortBy} onValueChange={onSortChange}>
+          <SelectTrigger className="w-[180px] focus:outline-none focus:ring-0 focus:border-border focus-visible:ring-0 focus-visible:outline-none">
+            <SelectValue placeholder="Sort by..." />
+          </SelectTrigger>
+          <SelectContent className="font-sans">
+            <SelectItem 
+              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0" 
+              value="Email count desc"
+              style={{ 
+                border: 'none !important',
+                outline: 'none !important',
+                boxShadow: 'none !important'
+              }}
+            >
+              Most Emails
+            </SelectItem>
+            <SelectItem 
+              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 " 
+              value="Email count asc"
+              style={{ 
+                border: 'none !important',
+                outline: 'none !important',
+                boxShadow: 'none !important'
+              }}
+            >
+              Least Emails
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

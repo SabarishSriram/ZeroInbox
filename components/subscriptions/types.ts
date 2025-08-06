@@ -36,6 +36,7 @@ export interface SearchAndControlsProps {
   onSortChange: (sort: string) => void;
   filterBy: string;
   onFilterChange: (filter: string) => void;
+  gmailLabels?: any[];
 }
 
 export interface UnsubscribeDialogProps {
@@ -49,6 +50,9 @@ export interface SubscriptionItemProps {
   item: EmailStats;
   onUnsubscribeClick: (item: EmailStats) => void;
   onKeepClick: (item: EmailStats) => void;
+  onMoveToLabelClick?: (item: EmailStats) => void;
+  isSelected?: boolean;
+  onSelectionChange?: (item: EmailStats, selected: boolean) => void;
 }
 
 export interface UnsubscribedItemProps {
