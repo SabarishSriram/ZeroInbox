@@ -105,12 +105,12 @@ const DeleteLabelDialog: React.FC<{
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
         className="sm:max-w-md font-sans"
         style={{
-          animation: isOpen 
-            ? 'dialog-enter 0.2s ease-out' 
-            : 'dialog-exit 0.2s ease-in'
+          animation: isOpen
+            ? "dialog-enter 0.2s ease-out"
+            : "dialog-exit 0.2s ease-in",
         }}
       >
         <DialogHeader>
@@ -121,11 +121,14 @@ const DeleteLabelDialog: React.FC<{
           <div className="text-sm text-muted-foreground">
             Are you sure you want to delete the label{" "}
             <span className="font-semibold text-foreground">
-              "{labelName.includes("/") ? labelName.split("/").pop() : labelName}"
+              "
+              {labelName.includes("/") ? labelName.split("/").pop() : labelName}
+              "
             </span>
             {labelName.includes("/") && (
               <>
-                {" "}from{" "}
+                {" "}
+                from{" "}
                 <span className="font-medium text-foreground">
                   {labelName.split("/").slice(0, -1).join(" > ")}
                 </span>
@@ -133,10 +136,13 @@ const DeleteLabelDialog: React.FC<{
             )}
             ?
           </div>
-          
+
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
             <div className="font-medium mb-1">⚠️ Warning:</div>
-            <div>This action cannot be undone. The label will be permanently removed from your Gmail account.</div>
+            <div>
+              This action cannot be undone. The label will be permanently
+              removed from your Gmail account.
+            </div>
           </div>
 
           {error && (
@@ -196,29 +202,29 @@ const DeleteLabelDialog: React.FC<{
           scrollbar-width: thin;
           scrollbar-color: transparent transparent;
         }
-        
+
         .custom-scrollbar:hover {
           scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background-color: transparent;
           border-radius: 3px;
           transition: background-color 0.2s ease;
         }
-        
+
         .custom-scrollbar:hover::-webkit-scrollbar-thumb {
           background-color: rgba(156, 163, 175, 0.5);
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background-color: rgba(156, 163, 175, 0.7);
         }
@@ -244,7 +250,7 @@ const RenameLabelDialog: React.FC<{
     if (isOpen) {
       // For nested labels, show only the last part for editing
       const isNested = currentName.includes("/");
-      const displayName = isNested 
+      const displayName = isNested
         ? currentName.split("/").pop() || currentName
         : currentName;
       setNewName(displayName);
@@ -270,7 +276,7 @@ const RenameLabelDialog: React.FC<{
 
       // For nested labels, reconstruct the full path with the new name
       const isNested = currentName.includes("/");
-      const finalName = isNested 
+      const finalName = isNested
         ? currentName.split("/").slice(0, -1).join("/") + "/" + newName.trim()
         : newName.trim();
 
@@ -278,7 +284,7 @@ const RenameLabelDialog: React.FC<{
         originalName: currentName,
         newDisplayName: newName.trim(),
         finalFullName: finalName,
-        isNested
+        isNested,
       });
 
       const response = await fetch("/api/gmail-labels/rename", {
@@ -315,12 +321,12 @@ const RenameLabelDialog: React.FC<{
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent 
+      <DialogContent
         className="sm:max-w-md font-sans"
         style={{
-          animation: isOpen 
-            ? 'dialog-enter 0.2s ease-out' 
-            : 'dialog-exit 0.2s ease-in'
+          animation: isOpen
+            ? "dialog-enter 0.2s ease-out"
+            : "dialog-exit 0.2s ease-in",
         }}
       >
         <DialogHeader>
@@ -329,9 +335,7 @@ const RenameLabelDialog: React.FC<{
 
         <div className="space-y-4 mt-3">
           <div>
-            <label className="block text-md font-medium mb-1">
-              Label Name
-            </label>
+            <label className="block text-md font-medium mb-1">Label Name</label>
             {currentName.includes("/") && (
               <div className="text-sm text-muted-foreground mb-2 px-3 py-2 bg-muted/50 rounded border">
                 <span className="font-medium">Parent path:</span>{" "}
@@ -358,7 +362,9 @@ const RenameLabelDialog: React.FC<{
               <div className="text-sm text-muted-foreground mt-1">
                 <span className="font-medium">Full name will be:</span>{" "}
                 <code className="bg-muted px-1 py-0.5 rounded text-xs">
-                  {currentName.split("/").slice(0, -1).join("/") + "/" + newName.trim()}
+                  {currentName.split("/").slice(0, -1).join("/") +
+                    "/" +
+                    newName.trim()}
                 </code>
               </div>
             )}
@@ -409,9 +415,15 @@ const Sidebar = () => {
   const [showCreateLabelDialog, setShowCreateLabelDialog] = useState(false);
   const [activeSelect, setActiveSelect] = useState<string | null>(null);
   const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [selectedLabel, setSelectedLabel] = useState<{ id: string; name: string } | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [labelToDelete, setLabelToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [labelToDelete, setLabelToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const pathname = usePathname();
 
@@ -495,21 +507,21 @@ const Sidebar = () => {
         const sortedLabels = userLabels.sort((a: any, b: any) => {
           const aDepth = a.name.split("/").length;
           const bDepth = b.name.split("/").length;
-          
+
           // Get the root parent for each label
           const aRoot = a.name.split("/")[0];
           const bRoot = b.name.split("/")[0];
-          
+
           // If they have different root parents, sort by root parent name
           if (aRoot !== bRoot) {
             return aRoot.localeCompare(bRoot);
           }
-          
+
           // Same root parent - sort by depth first (parents before children)
           if (aDepth !== bDepth) {
             return aDepth - bDepth;
           }
-          
+
           // Same root and depth - sort alphabetically
           return a.name.localeCompare(b.name);
         });
@@ -587,20 +599,27 @@ const Sidebar = () => {
 
   const handleDeleteLabel = async (labelId: string, labelName: string) => {
     // Open delete confirmation dialog instead of browser alert
-    const fullLabel = gmailLabels.find(label => label.label_id === labelId);
+    const fullLabel = gmailLabels.find((label) => label.label_id === labelId);
     const fullLabelName = fullLabel?.name || labelName;
-    
+
     setLabelToDelete({ id: labelId, name: fullLabelName });
     setShowDeleteDialog(true);
     setActiveSelect(null);
   };
 
+  const handleLabelClick = (labelId: string, labelName: string) => {
+    // Navigate to the labels page with the selected label
+    window.location.href = `/labels?label=${labelId}&labelName=${encodeURIComponent(
+      labelName
+    )}`;
+  };
+
   const startRename = (labelId: string, currentName: string) => {
     // For nested labels, we need to preserve the full path structure
     // currentName here is the display name, but we need the full label name
-    const fullLabel = gmailLabels.find(label => label.label_id === labelId);
+    const fullLabel = gmailLabels.find((label) => label.label_id === labelId);
     const fullLabelName = fullLabel?.name || currentName;
-    
+
     setSelectedLabel({ id: labelId, name: fullLabelName });
     setShowRenameDialog(true);
     setActiveSelect(null);
@@ -782,11 +801,9 @@ const Sidebar = () => {
           </div>
           <ul className="space-y-1">
             {loadingLabels ? (
-              <li className="text-sm text-muted-foreground px-2 py-3">
-                <div className="flex items-center justify-center space-x-2 py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                </div>
-              </li>
+              <div className="flex items-center justify-center bg-transparent min-h-[200px]">
+                <span className="inline-block w-6 h-6 border-2 border-t-primary rounded-full animate-spin" />
+              </div>
             ) : gmailLabels.length > 0 ? (
               gmailLabels.map((label) => {
                 // Check if this is a nested label
@@ -805,10 +822,15 @@ const Sidebar = () => {
                 return (
                   <li key={label.label_id}>
                     <div
-                      className="flex items-center justify-between px-2 py- text-sm text-foreground hover:bg-hovered rounded transition-colors group"
+                      className="flex items-center justify-between px-2 py-0.5 text-sm text-foreground hover:bg-hovered rounded transition-colors group"
                       style={{ paddingLeft: `${8 + indentLevel * 16}px` }}
                     >
-                      <div className="flex font-medium items-center gap-2 min-w-0 flex-1">
+                      <button
+                        className="flex font-medium items-center gap-2 min-w-0 flex-1 text-left"
+                        onClick={() =>
+                          handleLabelClick(label.label_id, label.name)
+                        }
+                      >
                         {isNested ? (
                           <div className="flex items-center gap-1">
                             <FolderIcon className="w-4 h-4 text-foreground flex-shrink-0" />
@@ -818,9 +840,13 @@ const Sidebar = () => {
                         )}
                         <div className="flex flex-col min-w-0 flex-1">
                           <span className="truncate">{displayName}</span>
-                          
+                          {isNested && (
+                            <span className="text-xs text-muted-foreground/70 truncate">
+                              {parentPath}
+                            </span>
+                          )}
                         </div>
-                      </div>
+                      </button>
 
                       <div className="flex items-center gap-1">
                         {label.messages_unread > 0 && (
@@ -840,14 +866,16 @@ const Sidebar = () => {
                             )
                           }
                         >
-                          <SelectTrigger className="p-1 rounded hover:bg-muted-foreground/10 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center border-none bg-transparent shadow-none">
-                          </SelectTrigger>
+                          <SelectTrigger className="p-1 rounded hover:bg-muted-foreground/10 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center border-none bg-transparent shadow-none"></SelectTrigger>
                           <SelectContent
                             className="font-sans"
                             align="end"
                             side="bottom"
                           >
-                            <SelectItem className="border-none hover:bg-hovered" value="rename">
+                            <SelectItem
+                              className="border-none hover:bg-hovered"
+                              value="rename"
+                            >
                               Rename
                             </SelectItem>
                             <SelectItem
