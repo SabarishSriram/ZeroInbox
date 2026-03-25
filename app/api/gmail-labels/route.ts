@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -79,8 +79,9 @@ export async function POST(req: NextRequest) {
 
     console.log("Using user ID:", userId);
 
-    // Create Supabase client
+    // Create Supabase clients (user-scoped + admin for DB writes)
     const supabase = await createClient();
+    const adminSupabase = await createAdminClient();
 
     // Set up Gmail API client (same as email analyze)
     const auth = new google.auth.OAuth2();
@@ -168,7 +169,7 @@ export async function POST(req: NextRequest) {
     if (gmailLabels.length > 0) {
       try {
         // Delete existing labels for this user
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await adminSupabase
           .from("gmail_labels")
           .delete()
           .eq("user_id", userId);
@@ -196,7 +197,7 @@ export async function POST(req: NextRequest) {
           message_list_visibility: label.messageListVisibility || "show",
         }));
 
-        const { data: insertedLabels, error: insertError } = await supabase
+        const { data: insertedLabels, error: insertError } = await adminSupabase
           .from("gmail_labels")
           .insert(labelsToInsert)
           .select();
