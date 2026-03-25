@@ -22,14 +22,14 @@ const SearchAndControls: React.FC<SearchAndControlsProps> = ({
   gmailLabels = [],
 }) => {
   return (
-    <div className="flex items-center justify-between gap-4 mb-6">
+    <div className="flex items-center justify-between gap-4 mb-5 rounded-xl border border-border bg-card px-3 py-2 sm:px-4 sm:py-3">
       {/* Search */}
       <div className="relative flex-1 max-w-md">
         <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <input
           type="text"
           placeholder="Search Senders"
-          value={searchTerm}  
+          value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="w-full pl-10 pr-4 py-1 border border-border rounded-md bg-white text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
         />
@@ -43,37 +43,37 @@ const SearchAndControls: React.FC<SearchAndControlsProps> = ({
             <SelectValue placeholder="Filter by label..." />
           </SelectTrigger>
           <SelectContent className="font-sans">
-            <SelectItem 
+            <SelectItem
               className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
               value="All"
-              style={{ 
-                border: 'none !important',
-                outline: 'none !important',
-                boxShadow: 'none !important'
+              style={{
+                border: "none !important",
+                outline: "none !important",
+                boxShadow: "none !important",
               }}
             >
               All
             </SelectItem>
-            <SelectItem 
+            <SelectItem
               className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
               value="Inbox"
-              style={{ 
-                border: 'none !important',
-                outline: 'none !important',
-                boxShadow: 'none !important'
+              style={{
+                border: "none !important",
+                outline: "none !important",
+                boxShadow: "none !important",
               }}
             >
               Inbox
             </SelectItem>
             {gmailLabels.map((label) => (
-              <SelectItem 
+              <SelectItem
                 key={label.id}
                 className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
                 value={label.id}
-                style={{ 
-                  border: 'none !important',
-                  outline: 'none !important',
-                  boxShadow: 'none !important'
+                style={{
+                  border: "none !important",
+                  outline: "none !important",
+                  boxShadow: "none !important",
                 }}
               >
                 {label.name}
@@ -88,24 +88,24 @@ const SearchAndControls: React.FC<SearchAndControlsProps> = ({
             <SelectValue placeholder="Sort by..." />
           </SelectTrigger>
           <SelectContent className="font-sans">
-            <SelectItem 
-              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0" 
+            <SelectItem
+              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 hover:ring-0 focus:ring-0"
               value="Email count desc"
-              style={{ 
-                border: 'none !important',
-                outline: 'none !important',
-                boxShadow: 'none !important'
+              style={{
+                border: "none !important",
+                outline: "none !important",
+                boxShadow: "none !important",
               }}
             >
               Most Emails
             </SelectItem>
-            <SelectItem 
-              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 " 
+            <SelectItem
+              className="hover:bg-hovered cursor-pointer border-none outline-none ring-0 "
               value="Email count asc"
-              style={{ 
-                border: 'none !important',
-                outline: 'none !important',
-                boxShadow: 'none !important'
+              style={{
+                border: "none !important",
+                outline: "none !important",
+                boxShadow: "none !important",
               }}
             >
               Least Emails

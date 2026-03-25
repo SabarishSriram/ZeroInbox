@@ -133,148 +133,143 @@ export const RecentEmailsDialog: React.FC<RecentEmailsDialogProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
-          className="max-w-xl h-[580px] font-sans rounded-2xl border-0 p-0 overflow-hidden"
+          className="max-w-xl max-h-[500px] font-sans rounded-2xl p-4 overflow-auto"
           style={{
             animation: isOpen
               ? "dialog-enter 0.2s ease-out"
               : "dialog-exit 0.2s ease-in",
           }}
         >
-          {/* Header */}
-          <DialogHeader className="p-4 pb-3 border-b border-border">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {/* Domain Logo */}
-                <div className="relative">
-                  <Image
-                    src={`https://logo.clearbit.com/${domain}`}
-                    alt={domain}
-                    width={32}
-                    height={32}
-                    className="w-8 h-8 object-contain rounded"
-                    onError={(e) => {
-                      // Fallback to letter icon if logo fails to load
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = "none";
-                      const fallback = target.parentElement?.querySelector(
-                        ".fallback-icon"
-                      ) as HTMLElement;
-                      if (fallback) fallback.style.display = "flex";
-                    }}
-                  />
-                  {/* Fallback Icon */}
-                  <div
-                    className="fallback-icon w-8 h-8 bg-primary/10 rounded-lg items-center justify-center absolute top-0 left-0"
-                    style={{ display: "none" }}
-                  >
-                    <span className="text-sm font-bold text-primary">
-                      {domain.charAt(0).toUpperCase()}
-                    </span>
-                  </div>
-                </div>
-                {/* Domain Info */}
-                <div>
-                  <DialogTitle className="text-base font-semibold text-foreground">
-                    {domain.split("@")[0] || domain}
-                  </DialogTitle>
-                  <div className="text-xs text-muted-foreground">
-                    email@{domain}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="p-1 rounded-full hover:bg-muted transition-colors"
-              >
-                <XMarkIcon className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-          </DialogHeader>
-
-          {/* Stats Section */}
-          {emailStats && (
-            <div className="px-4 py-3 bg-muted/20 border-b border-border/50">
-              <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-1">
-                  <EnvelopeIcon className="w-4 h-4 text-muted-foreground" />
-                  <span className="font-medium text-foreground">
-                    {emailStats.total_emails}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <CalendarIcon className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">
-                    {emailStats.monthly_avg} monthly
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <ClockIcon className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">20h ago</span>
-                </div>
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="flex flex-col items-center justify-center">
+                <div className="w-8 h-8 border-4 border-black border-t-transparent rounded-full animate-spin mb-4" />
               </div>
             </div>
-          )}
-
-          {/* Subheader */}
-          <div className="px-4 py-2 bg-muted/10 border-b border-border/30">
-            <h4 className="text-sm font-medium text-foreground">
-              Recent Emails (Click to view email)
-            </h4>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-hidden">
-            {loading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
-                  <span className="text-sm text-muted-foreground">
-                    Loading emails...
-                  </span>
-                </div>
-              </div>
-            ) : error ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-red-500 font-medium mb-1 text-sm">
-                    Error
-                  </div>
-                  <div className="text-sm text-muted-foreground">{error}</div>
-                </div>
-              </div>
-            ) : emails.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-sm text-muted-foreground">
-                    No recent emails found
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 pt-2 h-full overflow-y-auto">
-                <div className="space-y-1">
-                  {emails.map((email) => (
+          ) : (
+            <>
+              {/* Header - logo, domain, email, stats, actions, close */}
+              <div className="border-border border-b relative pb-4">
+                <button
+                  onClick={onClose}
+                  className="absolute top-4 right-4 p-1 rounded-full hover:bg-muted transition-colors"
+                  style={{ border: 'none', outline: 'none' }}
+                  aria-label="Close"
+                >
+                </button>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="relative flex-shrink-0">
+                    <Image
+                      src={`https://logo.clearbit.com/${domain}`}
+                      alt={domain}
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 object-contain rounded bg-white"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                        const fallback = target.parentElement?.querySelector(
+                          ".fallback-icon"
+                        ) as HTMLElement;
+                        if (fallback) fallback.style.display = "flex";
+                      }}
+                    />
                     <div
-                      key={email.id}
-                      className="group py-2 px-3 hover:bg-muted/30 transition-colors cursor-pointer border-b border-border/30 last:border-b-0"
-                      onClick={() => handleEmailClick(email)}
+                      className="fallback-icon w-10 h-10 bg-primary/10 rounded flex items-center justify-center absolute top-0 left-0"
+                      style={{ display: "none" }}
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="text-sm text-muted-foreground font-medium min-w-[3.5rem] pt-0.5">
-                          {formatDateShort(email.date)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm text-foreground group-hover:text-primary transition-colors leading-relaxed">
-                            {email.subject || "No Subject"}
-                          </h3>
-                        </div>
+                      <span className="text-lg font-bold text-primary">
+                        {domain.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-lg text-foreground leading-tight">
+                      {domain.split("@")[0] || domain}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      email@{domain}
+                    </div>
+                  </div>
+                </div>
+                {emailStats && (
+                  <div className="flex items-center gap-4 text-xs mb-3">
+                    <div className="flex items-center gap-1">
+                      <EnvelopeIcon className="w-4 h-4 text-muted-foreground" />
+                      <span className="font-medium text-foreground">
+                        {emailStats.total_emails}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <CalendarIcon className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {emailStats.monthly_avg} monthly
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <ClockIcon className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">20h ago</span>
+                    </div>
+                  </div>
+                )}
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <button className="px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded hover:bg-primary/20 transition-colors">
+                    Keep
+                  </button>
+                  <button className="px-3 py-1 bg-red-100 text-red-700 text-xs font-medium rounded hover:bg-red-200 transition-colors">
+                    Unsubscribe
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-hidden">
+                {error ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-red-500 font-medium text-sm">
+                        Error
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {error}
                       </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : emails.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-sm text-muted-foreground">
+                        No recent emails found
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full overflow-y-auto">
+                    <div className="">
+                      {emails.map((email) => (
+                        <div
+                          key={email.id}
+                          className="group py-1 px-2 hover:bg-hovered transition-colors cursor-pointer border-b border-border/30 last:border-b-0"
+                          onClick={() => handleEmailClick(email)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="text-xs text-muted-foreground font-medium min-w-[3.5rem] pt-0.5">
+                              {formatDateShort(email.date)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-xs text-foreground group-hover:text-primary transition-colors leading-relaxed font-semibold">
+                                {email.subject || "No Subject"}
+                              </h3>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </DialogContent>
 
         <style jsx global>{`
@@ -303,6 +298,31 @@ export const RecentEmailsDialog: React.FC<RecentEmailsDialogProps> = ({
           [data-radix-dialog-overlay] {
             backdrop-filter: blur(4px) !important;
             -webkit-backdrop-filter: blur(4px) !important;
+          }
+
+          .max-w-xl::-webkit-scrollbar,
+          .h-full.overflow-y-auto::-webkit-scrollbar {
+            width: 6px;
+            background: transparent;
+          }
+          .max-w-xl::-webkit-scrollbar-thumb,
+          .h-full.overflow-y-auto::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 4px;
+          }
+          .max-w-xl.dark::-webkit-scrollbar-thumb,
+          .h-full.overflow-y-auto.dark::-webkit-scrollbar-thumb {
+            background: #374151;
+          }
+          /* Firefox */
+          .max-w-xl,
+          .h-full.overflow-y-auto {
+            scrollbar-width: thin;
+            scrollbar-color: #d1d5db transparent;
+          }
+          .max-w-xl.dark,
+          .h-full.overflow-y-auto.dark {
+            scrollbar-color: #374151 transparent;
           }
         `}</style>
       </Dialog>

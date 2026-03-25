@@ -14,7 +14,7 @@ const UnsubscribedItem: React.FC<UnsubscribedItemProps> = ({
     }
   };
   return (
-    <div className="flex items-center gap-4 p-3 bg-white border border-border rounded-xl hover:bg-hovered/50 transition-colors">
+    <div className="flex items-center gap-4 p-3 sm:p-4 bg-card border border-border rounded-xl shadow-sm hover:shadow-md hover:bg-muted/60 transition-colors transition-shadow">
       {/* Checkbox */}
       <input
         type="checkbox"

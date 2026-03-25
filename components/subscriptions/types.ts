@@ -4,6 +4,7 @@ export interface EmailStats {
   total_emails: number;
   monthly_avg: number;
   recent_emails?: number;
+  updated_at: string;
 }
 
 export interface UnsubscribedSender {

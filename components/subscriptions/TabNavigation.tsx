@@ -7,14 +7,14 @@ const TabNavigation: React.FC<TabNavigationProps> = ({
   onTabChange,
 }) => {
   return (
-    <div className="flex items-center gap-1 mb-6 border-b border-border">
+    <div className="inline-flex rounded-full bg-muted p-1 border border-border/60">
       {tabs.map((tab) => (
         <button
           key={tab}
           onClick={() => onTabChange(tab)}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
+          className={`px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-medium rounded-full transition-colors ${
             selectedTab === tab
-              ? "text-foreground border-b-2 border-primary"
+              ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
