@@ -21,7 +21,14 @@ const GmailConnectionModal: React.FC<GmailConnectionModalProps> = ({
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className=" [&>button.absolute.right-4.top-4]:hidden w-[340px] rounded-2xl bg-content font-sans shadow-xl border-0 p-4">
+      <DialogContent
+        className=" [&>button.absolute.right-4.top-4]:hidden w-[340px] rounded-2xl bg-content font-sans shadow-xl border-0 p-4"
+        style={{
+          animation: isOpen
+            ? "dialog-enter 0.2s ease-out"
+            : "dialog-exit 0.2s ease-in",
+        }}
+      >
         {isConnecting ? (
           <div className="flex flex-col items-center justify-center p-10 min-h-[220px]">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-black border-t-transparent mb-4" />
@@ -98,6 +105,38 @@ const GmailConnectionModal: React.FC<GmailConnectionModalProps> = ({
           </>
         )}
       </DialogContent>
+
+      <style jsx global>{`
+        @keyframes dialog-enter {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -48%) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+
+        @keyframes dialog-exit {
+          from {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          to {
+            opacity: 0;
+            transform: translate(-50%, -48%) scale(0.95);
+          }
+        }
+
+        [data-radix-dialog-content] {
+          position: fixed !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
+          animation: dialog-enter 0.2s ease-out !important;
+        }
+      `}</style>
     </Dialog>
   );
 };

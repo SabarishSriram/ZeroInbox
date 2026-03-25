@@ -47,8 +47,16 @@ const DeleteLabelDialog: React.FC<{
   onClose: () => void;
   labelId: string | null;
   labelName: string;
+  childCount?: number;
   onLabelDeleted: () => void;
-}> = ({ isOpen, onClose, labelId, labelName, onLabelDeleted }) => {
+}> = ({
+  isOpen,
+  onClose,
+  labelId,
+  labelName,
+  childCount = 0,
+  onLabelDeleted,
+}) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
 
@@ -66,24 +74,26 @@ const DeleteLabelDialog: React.FC<{
     setError("");
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) {
+      const session = await supabase.auth.getSession();
+      if (!session?.data?.session?.user) {
         setError("Authentication required");
         return;
       }
 
+      // For tree structure, we need to send all child IDs for deletion
       const response = await fetch("/api/gmail-labels/delete", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.session.access_token}`,
+          Authorization: `Bearer ${session.data.session.access_token}`,
         },
         body: JSON.stringify({
-          accessToken: session.session.provider_token,
-          userId: session.session.user.id,
-          userEmail: session.session.user.email,
+          accessToken: session.data.session.provider_token,
+          userId: session.data.session.user.id,
+          userEmail: session.data.session.user.email,
           labelId: labelId,
+          deleteChildren: childCount > 0, // Flag to indicate child deletion
         }),
       });
 
@@ -135,13 +145,20 @@ const DeleteLabelDialog: React.FC<{
               </>
             )}
             ?
+            {childCount > 0 && (
+              <div className="mt-2 text-orange-700 bg-orange-50 border border-orange-200 rounded-md p-2">
+                <strong>⚠️ Warning:</strong> This label contains {childCount}{" "}
+                nested label(s) that will also be deleted.
+              </div>
+            )}
           </div>
 
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
             <div className="font-medium mb-1">⚠️ Warning:</div>
             <div>
-              This action cannot be undone. The label will be permanently
-              removed from your Gmail account.
+              This action cannot be undone. The label
+              {childCount > 0 && " and all its nested labels"} will be
+              permanently removed from your Gmail account.
             </div>
           </div>
 
@@ -395,7 +412,7 @@ const RenameLabelDialog: React.FC<{
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
 );
 
 interface GmailLabel {
@@ -406,9 +423,245 @@ interface GmailLabel {
   messages_total: number;
   messages_unread: number;
   user_id: string;
+  children?: GmailLabel[];
+  isExpanded?: boolean;
+  depth?: number;
 }
 
-const Sidebar = () => {
+interface CachedSession {
+  session: any;
+  timestamp: number;
+}
+
+interface SidebarProps {
+  onSyncComplete?: () => void;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ onSyncComplete }) => {
+  // Session cache to avoid repeated calls
+  const [cachedSession, setCachedSession] = useState<CachedSession | null>(
+    null,
+  );
+
+  // --- Sync Info State and Logic ---
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  const [lastEmailFetched, setLastEmailFetched] = useState<Date | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(100); // 100% if up-to-date
+  const [loadingLastSync, setLoadingLastSync] = useState(true);
+
+  // Helper function to get cached session or fetch new one
+  const getCachedSession = async (): Promise<any> => {
+    const now = Date.now();
+    const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+    if (cachedSession && now - cachedSession.timestamp < CACHE_DURATION) {
+      return cachedSession.session;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const newCache: CachedSession = {
+      session: sessionData?.session,
+      timestamp: now,
+    };
+    setCachedSession(newCache);
+    return sessionData?.session;
+  };
+
+  // Helper function to build tree structure from flat labels
+  const buildLabelTree = (flatLabels: any[]): GmailLabel[] => {
+    const labelMap = new Map<string, GmailLabel>();
+    const rootLabels: GmailLabel[] = [];
+
+    // First pass: create all label objects
+    flatLabels.forEach((label: any) => {
+      const treeLabel: GmailLabel = {
+        id: 0,
+        label_id: label.id,
+        name: label.name,
+        type: label.type || "user",
+        messages_total: label.messagesTotal || 0,
+        messages_unread: label.messagesUnread || 0,
+        user_id: label.user_id,
+        children: [],
+        isExpanded: false,
+        depth: label.name.split("/").length - 1,
+      };
+      labelMap.set(label.name, treeLabel);
+    });
+
+    // Second pass: build parent-child relationships
+    flatLabels.forEach((label: any) => {
+      const parts = label.name.split("/");
+      const treeLabel = labelMap.get(label.name);
+
+      if (!treeLabel) return;
+
+      if (parts.length === 1) {
+        // Root level label
+        rootLabels.push(treeLabel);
+      } else {
+        // Nested label - find parent
+        const parentPath = parts.slice(0, -1).join("/");
+        const parent = labelMap.get(parentPath);
+        if (parent) {
+          parent.children = parent.children || [];
+          parent.children.push(treeLabel);
+        } else {
+          // Parent doesn't exist, treat as root
+          rootLabels.push(treeLabel);
+        }
+      }
+    });
+
+    // Sort function for tree labels
+    const sortLabels = (labels: GmailLabel[]): GmailLabel[] => {
+      return labels.sort((a, b) => {
+        // Sort by name
+        const aName = a.name.split("/").pop() || a.name;
+        const bName = b.name.split("/").pop() || b.name;
+        const result = aName.localeCompare(bName);
+
+        // Recursively sort children
+        if (a.children) a.children = sortLabels(a.children);
+        if (b.children) b.children = sortLabels(b.children);
+
+        return result;
+      });
+    };
+
+    return sortLabels(rootLabels);
+  };
+
+  // Helper function to collect all child label IDs recursively
+  const collectChildLabelIds = (label: GmailLabel): string[] => {
+    const ids = [label.label_id];
+    if (label.children) {
+      label.children.forEach((child) => {
+        ids.push(...collectChildLabelIds(child));
+      });
+    }
+    return ids;
+  };
+
+  // Helper function to toggle label expansion
+  const toggleLabelExpansion = (labelId: string) => {
+    const updateExpansion = (labels: GmailLabel[]): GmailLabel[] => {
+      return labels.map((label) => {
+        if (label.label_id === labelId) {
+          return { ...label, isExpanded: !label.isExpanded };
+        }
+        if (label.children) {
+          return { ...label, children: updateExpansion(label.children) };
+        }
+        return label;
+      });
+    };
+    setGmailLabels(updateExpansion(gmailLabels));
+  };
+
+  // Fetch last synced and last email fetched times from database
+  const fetchLastSyncInfo = async () => {
+    try {
+      const session = await getCachedSession();
+      if (!session?.user) {
+        setLoadingLastSync(false);
+        return;
+      }
+
+      // Fetch the most recent email analysis record to get last sync time
+      const { data: analysisData } = await supabase
+        .from("email_stats")
+        .select("updated_at")
+        .eq("user_id", session.user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (analysisData?.updated_at) {
+        setLastEmailFetched(new Date(analysisData.updated_at));
+        setLastSynced(new Date(analysisData.updated_at));
+      }
+    } catch (error) {
+      console.error("Error fetching last sync info:", error);
+    } finally {
+      setLoadingLastSync(false);
+    }
+  };
+
+  // Fetch last sync info on component mount
+  useEffect(() => {
+    fetchLastSyncInfo();
+  }, []);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncProgress(0);
+    try {
+      // Get cached session for credentials
+      const session = await getCachedSession();
+      // Use provider_token for Gmail API access
+      const accessToken = session?.provider_token;
+      const userId = session?.user?.id;
+      const userEmail = session?.user?.email;
+
+      const res = await fetch("/api/email/analyze", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          userId,
+          userEmail,
+        }),
+      });
+      if (res.ok) {
+        setSyncProgress(100);
+        const now = new Date();
+        setLastSynced(now);
+        setLastEmailFetched(now);
+        if (onSyncComplete) onSyncComplete();
+      } else {
+        setSyncProgress(0);
+        // Optionally show error to user
+      }
+    } catch (e) {
+      setSyncProgress(0);
+      // Optionally show error to user
+    }
+    setSyncing(false);
+  };
+
+  // Helper function to format time difference
+  const getTimeAgo = (date: Date | null): string => {
+    if (!date) return "Never";
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMinutes < 1) return "Just now";
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
+  const lastSyncedText = React.useMemo(() => {
+    if (loadingLastSync) return "Checking...";
+    if (!lastSynced) return "Never synced";
+    return `Synced ${getTimeAgo(lastSynced)}`;
+  }, [lastSynced, syncing, loadingLastSync]);
+
+  const lastEmailFetchedText = React.useMemo(() => {
+    if (loadingLastSync) return "Checking...";
+    if (!lastEmailFetched) return "No emails fetched";
+    return `Last email ${getTimeAgo(lastEmailFetched)}`;
+  }, [lastEmailFetched, syncing, loadingLastSync]);
+
+  const nextSyncText = "Synced daily"; // Simplified sync schedule text
   const [user, setUser] = useState<User | null>(null);
   const [gmailLabels, setGmailLabels] = useState<GmailLabel[]>([]);
   const [loadingLabels, setLoadingLabels] = useState(false);
@@ -423,6 +676,7 @@ const Sidebar = () => {
   const [labelToDelete, setLabelToDelete] = useState<{
     id: string;
     name: string;
+    childCount?: number;
   } | null>(null);
 
   const pathname = usePathname();
@@ -432,9 +686,9 @@ const Sidebar = () => {
 
     setLoadingLabels(true);
     try {
-      const { data: session } = await supabase.auth.getSession();
+      const session = await getCachedSession();
 
-      if (!session?.session?.user) {
+      if (!session?.user) {
         console.error("No valid session found");
         return;
       }
@@ -442,44 +696,33 @@ const Sidebar = () => {
       console.log("Fetching Gmail labels using streamlined flow...");
 
       // Use the streamlined API that does: Gmail → Database → Frontend
-      // Following the same pattern as email analyze API
       const response = await fetch("/api/gmail-labels", {
-        method: "POST", // Changed to POST like email analyze
+        method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          accessToken: session.session.provider_token, // Use provider_token for Gmail API
-          userId: session.session.user.id,
-          userEmail: session.session.user.email,
+          accessToken: session.provider_token,
+          userId: session.user.id,
+          userEmail: session.user.email,
         }),
       });
 
       console.log("Response status:", response.status);
-      console.log("Response ok:", response.ok);
 
       if (response.ok) {
         const data = await response.json();
         console.log("Gmail labels response data:", data);
-        console.log("Gmail labels flow completed:", data.flow);
         console.log("Fetched", data.count, "labels");
-        console.log(
-          "Storage status:",
-          data.stored ? "✓ Stored in DB" : "✗ Not stored"
-        );
-
-        if (data.storageMessage) {
-          console.log("Storage message:", data.storageMessage);
-        }
 
         // Filter labels for sidebar display - only show user-created labels
         const userLabels = (data.labels || []).filter((label: any) => {
           // Only user-created labels
           if (label.type !== "user") return false;
 
-          // Check if the label name (or any part of nested label) contains system labels
+          // Check if the label name contains system labels
           const labelParts = label.name.split("/");
           const hasSystemLabel = labelParts.some((part: string) =>
             [
@@ -497,62 +740,22 @@ const Sidebar = () => {
               "CATEGORY_PROMOTIONS",
               "CATEGORY_SOCIAL",
               "CATEGORY_PRIMARY",
-            ].includes(part.toUpperCase())
+            ].includes(part.toUpperCase()),
           );
 
-          return !hasSystemLabel; // Only include if no system labels found
+          return !hasSystemLabel;
         });
 
-        // Sort labels to show parent labels before their children
-        const sortedLabels = userLabels.sort((a: any, b: any) => {
-          const aDepth = a.name.split("/").length;
-          const bDepth = b.name.split("/").length;
-
-          // Get the root parent for each label
-          const aRoot = a.name.split("/")[0];
-          const bRoot = b.name.split("/")[0];
-
-          // If they have different root parents, sort by root parent name
-          if (aRoot !== bRoot) {
-            return aRoot.localeCompare(bRoot);
-          }
-
-          // Same root parent - sort by depth first (parents before children)
-          if (aDepth !== bDepth) {
-            return aDepth - bDepth;
-          }
-
-          // Same root and depth - sort alphabetically
-          return a.name.localeCompare(b.name);
-        });
-
-        // Convert Gmail API format to our GmailLabel format
-        const formattedLabels: GmailLabel[] = sortedLabels.map(
-          (label: any) => ({
-            id: 0, // Will be set by database
-            label_id: label.id,
-            name: label.name,
-            type: label.type || "user",
-            messages_total: label.messagesTotal || 0,
-            messages_unread: label.messagesUnread || 0,
-            user_id: session.session.user.id,
-          })
-        );
-
-        setGmailLabels(formattedLabels);
+        // Build tree structure from flat labels
+        const labelTree = buildLabelTree(userLabels);
+        setGmailLabels(labelTree);
       } else {
         console.error("Response not ok. Status:", response.status);
         try {
           const errorData = await response.json();
-          console.error("Error response data:", errorData);
           console.error("Failed to fetch Gmail labels:", errorData);
-
-          if (errorData.error?.includes("access token")) {
-            console.error("Gmail access token issue - user needs to reconnect");
-          }
         } catch (parseError) {
           console.error("Failed to parse error response:", parseError);
-          console.error("Raw response text:", await response.text());
         }
       }
     } catch (error) {
@@ -566,20 +769,20 @@ const Sidebar = () => {
     if (!newName.trim()) return;
 
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) return;
+      const session = await getCachedSession();
+      if (!session?.user) return;
 
       const response = await fetch("/api/gmail-labels/rename", {
         method: "POST",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session.session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          accessToken: session.session.provider_token,
-          userId: session.session.user.id,
-          userEmail: session.session.user.email,
+          accessToken: session.provider_token,
+          userId: session.user.id,
+          userEmail: session.user.email,
           labelId: labelId,
           newName: newName.trim(),
         }),
@@ -598,11 +801,34 @@ const Sidebar = () => {
   };
 
   const handleDeleteLabel = async (labelId: string, labelName: string) => {
-    // Open delete confirmation dialog instead of browser alert
-    const fullLabel = gmailLabels.find((label) => label.label_id === labelId);
-    const fullLabelName = fullLabel?.name || labelName;
+    // Find the label in the tree structure
+    const findLabelInTree = (
+      labels: GmailLabel[],
+      id: string,
+    ): GmailLabel | null => {
+      for (const label of labels) {
+        if (label.label_id === id) return label;
+        if (label.children) {
+          const found = findLabelInTree(label.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
 
-    setLabelToDelete({ id: labelId, name: fullLabelName });
+    const fullLabel = findLabelInTree(gmailLabels, labelId);
+    if (!fullLabel) return;
+
+    // Collect all child labels for deletion confirmation
+    const allChildIds = collectChildLabelIds(fullLabel);
+    const childCount = allChildIds.length - 1; // Exclude the parent label itself
+
+    // Show confirmation with child count info
+    setLabelToDelete({
+      id: labelId,
+      name: fullLabel.name,
+      childCount: childCount,
+    });
     setShowDeleteDialog(true);
     setActiveSelect(null);
   };
@@ -610,14 +836,27 @@ const Sidebar = () => {
   const handleLabelClick = (labelId: string, labelName: string) => {
     // Navigate to the labels page with the selected label
     window.location.href = `/labels?label=${labelId}&labelName=${encodeURIComponent(
-      labelName
+      labelName,
     )}`;
   };
 
   const startRename = (labelId: string, currentName: string) => {
-    // For nested labels, we need to preserve the full path structure
-    // currentName here is the display name, but we need the full label name
-    const fullLabel = gmailLabels.find((label) => label.label_id === labelId);
+    // Find the full label in tree structure
+    const findLabelInTree = (
+      labels: GmailLabel[],
+      id: string,
+    ): GmailLabel | null => {
+      for (const label of labels) {
+        if (label.label_id === id) return label;
+        if (label.children) {
+          const found = findLabelInTree(label.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const fullLabel = findLabelInTree(gmailLabels, labelId);
     const fullLabelName = fullLabel?.name || currentName;
 
     setSelectedLabel({ id: labelId, name: fullLabelName });
@@ -628,7 +867,7 @@ const Sidebar = () => {
   const handleSelectAction = (
     action: string,
     labelId: string,
-    labelName: string
+    labelName: string,
   ) => {
     if (action === "rename") {
       startRename(labelId, labelName);
@@ -636,6 +875,96 @@ const Sidebar = () => {
       handleDeleteLabel(labelId, labelName);
     }
     setActiveSelect(null);
+  };
+
+  // Tree Label Component for recursive rendering
+  const TreeLabelItem: React.FC<{
+    label: GmailLabel;
+    depth: number;
+  }> = ({ label, depth }) => {
+    const hasChildren = label.children && label.children.length > 0;
+    const displayName = label.name.split("/").pop() || label.name;
+
+    return (
+      <li key={label.label_id}>
+        <div
+          className="flex items-center justify-between px-2 py-0.5 text-sm text-foreground hover:bg-hovered rounded transition-colors group"
+          style={{ paddingLeft: `${8 + depth * 16}px` }}
+        >
+          <button
+            className="flex font-medium items-center gap-2 min-w-0 flex-1 text-left"
+            onClick={() => handleLabelClick(label.label_id, label.name)}
+          >
+            <div className="flex items-center gap-1">
+              {hasChildren && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleLabelExpansion(label.label_id);
+                  }}
+                  className="p-0.5 hover:bg-muted-foreground/20 rounded transition-colors"
+                >
+                  <ChevronDownIcon
+                    className={`w-3 h-3 text-muted-foreground transition-transform ${
+                      label.isExpanded ? "rotate-0" : "-rotate-90"
+                    }`}
+                  />
+                </button>
+              )}
+              <FolderIcon className="w-4 h-4 text-foreground flex-shrink-0" />
+            </div>
+            <span className="truncate">{displayName}</span>
+          </button>
+
+          <div className="flex items-center gap-1">
+            {label.messages_unread > 0 && (
+              <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full min-w-[1.25rem] h-5 flex items-center justify-center flex-shrink-0">
+                {label.messages_unread}
+              </span>
+            )}
+
+            {/* 3-dot menu */}
+            <Select
+              value=""
+              onValueChange={(value: string) =>
+                handleSelectAction(value, label.label_id, displayName)
+              }
+            >
+              <SelectTrigger className="p-1 rounded hover:bg-muted-foreground/10 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center border-none bg-transparent shadow-none">
+                <EllipsisHorizontalIcon className="w-3 h-3" />
+              </SelectTrigger>
+              <SelectContent className="font-sans" align="end" side="bottom">
+                <SelectItem
+                  className="border-none hover:bg-hovered"
+                  value="rename"
+                >
+                  Rename
+                </SelectItem>
+                <SelectItem
+                  value="delete"
+                  className="text-red-600 border-none hover:bg-hovered hover:cursor-pointer focus:text-red-600"
+                >
+                  Delete
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Render children if expanded */}
+        {hasChildren && label.isExpanded && (
+          <ul className="space-y-1">
+            {label.children!.map((child) => (
+              <TreeLabelItem
+                key={child.label_id}
+                label={child}
+                depth={depth + 1}
+              />
+            ))}
+          </ul>
+        )}
+      </li>
+    );
   };
 
   useEffect(() => {
@@ -647,6 +976,7 @@ const Sidebar = () => {
   useEffect(() => {
     if (user) {
       fetchGmailLabels();
+      fetchLastSyncInfo(); // Also fetch sync info when user is available
     }
   }, [user]);
 
@@ -661,10 +991,10 @@ const Sidebar = () => {
   }, []);
 
   return (
-    <aside className="fixed left-0 top-0 w-[270px] h-screen bg-sidebar shadow-lg flex flex-col justify-between font-sans z-50 overflow-y-auto custom-scrollbar">
+    <aside className="fixed left-0 top-0 w-[270px] h-screen bg-card border-r border-border shadow-sm flex flex-col justify-between font-sans z-40 overflow-y-auto custom-scrollbar">
       <div>
         {/* Top Section: Logo and Profile */}
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 bg-background/60">
           <div className="flex items-center gap-2">
             <Image
               src={rainboxlogo}
@@ -731,7 +1061,7 @@ const Sidebar = () => {
           </div>
         </div>
         {/* User Info */}
-        <div className="flex items-center mt-1 gap-2 border-2 px-2 py-2 mx-2 rounded-lg border-border hover:bg-hovered">
+        <div className="flex items-center mt-2 gap-2 border px-2 py-2 mx-3 rounded-lg border-border bg-muted/40 hover:bg-muted/60 transition-colors">
           <img
             src="https://www.gstatic.com/images/branding/product/1x/gmail_2020q4_48dp.png"
             alt="Gmail"
@@ -750,38 +1080,54 @@ const Sidebar = () => {
           </button>
         </div>
         {/* Navigation */}
-        <nav className="px-4 mt-3 py-2">
+        <nav className="px-3 mt-4 py-2">
+          <div className="px-1 mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Overview
+          </div>
           <ul className="space-y-1">
             <li>
               <a
                 href="/dashboard"
-                className={`flex items-center gap-2 py-2 px-2 rounded-lg text-foreground transition-colors ${
+                className={`flex items-center gap-2 py-2 px-2 rounded-lg text-sm transition-colors ${
                   pathname === "/dashboard"
-                    ? "bg-hovered font-semibold"
-                    : "hover:bg-hovered"
+                    ? "bg-hovered font-semibold text-foreground"
+                    : "text-muted-foreground hover:bg-hovered hover:text-foreground"
                 }`}
               >
-                <HomeIcon className="w-5 h-5 text-foreground" />
+                <HomeIcon className="w-5 h-5" />
                 Home
               </a>
             </li>
             <li>
               <a
                 href="/subscriptions"
-                className={`flex items-center gap-2 py-2 px-2 rounded-lg text-foreground transition-colors ${
+                className={`flex items-center gap-2 py-2 px-2 rounded-lg text-sm transition-colors ${
                   pathname === "/subscriptions"
-                    ? "bg-hovered font-semibold"
-                    : "hover:bg-hovered"
+                    ? "bg-hovered font-semibold text-foreground"
+                    : "text-muted-foreground hover:bg-hovered hover:text-foreground"
                 }`}
               >
-                <EnvelopeIcon className="w-5 h-5 text-foreground" />
+                <EnvelopeIcon className="w-5 h-5" />
                 Subscriptions
+              </a>
+            </li>
+            <li>
+              <a
+                href="/rollup"
+                className={`flex items-center gap-2 py-2 px-2 rounded-lg text-sm transition-colors ${
+                  pathname === "/rollup"
+                    ? "bg-hovered font-semibold text-foreground"
+                    : "text-muted-foreground hover:bg-hovered hover:text-foreground"
+                }`}
+              >
+                <InboxArrowDownIcon className="w-5 h-5" />
+                Rollup
               </a>
             </li>
           </ul>
         </nav>
         {/* Folders/Labels */}
-        <div className="px-4 py-2 border-">
+        <div className="px-3 py-2">
           <div className="flex items-center justify-between mb-2">
             <button
               onClick={fetchGmailLabels}
@@ -799,98 +1145,15 @@ const Sidebar = () => {
               <FolderPlusIcon className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-1 mt-1">
             {loadingLabels ? (
               <div className="flex items-center justify-center bg-transparent min-h-[200px]">
                 <span className="inline-block w-6 h-6 border-2 border-t-primary rounded-full animate-spin" />
               </div>
             ) : gmailLabels.length > 0 ? (
-              gmailLabels.map((label) => {
-                // Check if this is a nested label
-                const isNested = label.name.includes("/");
-                const labelParts = label.name.split("/");
-                const displayName = isNested
-                  ? labelParts[labelParts.length - 1]
-                  : label.name;
-                const indentLevel = labelParts.length - 1;
-
-                // For nested labels, show the full path context
-                const parentPath = isNested
-                  ? labelParts.slice(0, -1).join(" > ")
-                  : "";
-
-                return (
-                  <li key={label.label_id}>
-                    <div
-                      className="flex items-center justify-between px-2 py-0.5 text-sm text-foreground hover:bg-hovered rounded transition-colors group"
-                      style={{ paddingLeft: `${8 + indentLevel * 16}px` }}
-                    >
-                      <button
-                        className="flex font-medium items-center gap-2 min-w-0 flex-1 text-left"
-                        onClick={() =>
-                          handleLabelClick(label.label_id, label.name)
-                        }
-                      >
-                        {isNested ? (
-                          <div className="flex items-center gap-1">
-                            <FolderIcon className="w-4 h-4 text-foreground flex-shrink-0" />
-                          </div>
-                        ) : (
-                          <FolderIcon className="w-4 h-4 text-foreground flex-shrink-0" />
-                        )}
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="truncate">{displayName}</span>
-                          {isNested && (
-                            <span className="text-xs text-muted-foreground/70 truncate">
-                              {parentPath}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-
-                      <div className="flex items-center gap-1">
-                        {label.messages_unread > 0 && (
-                          <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full min-w-[1.25rem] h-5 flex items-center justify-center flex-shrink-0">
-                            {label.messages_unread}
-                          </span>
-                        )}
-
-                        {/* 3-dot menu with shadcn Select */}
-                        <Select
-                          value=""
-                          onValueChange={(value: string) =>
-                            handleSelectAction(
-                              value,
-                              label.label_id,
-                              displayName
-                            )
-                          }
-                        >
-                          <SelectTrigger className="p-1 rounded hover:bg-muted-foreground/10 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center border-none bg-transparent shadow-none"></SelectTrigger>
-                          <SelectContent
-                            className="font-sans"
-                            align="end"
-                            side="bottom"
-                          >
-                            <SelectItem
-                              className="border-none hover:bg-hovered"
-                              value="rename"
-                            >
-                              Rename
-                            </SelectItem>
-                            <SelectItem
-                              value="delete"
-                              className="text-red-600 border-none hover:bg-hovered hover:cursor-pointer focus:text-red-600"
-                            >
-                              Delete
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })
+              gmailLabels.map((label) => (
+                <TreeLabelItem key={label.label_id} label={label} depth={0} />
+              ))
             ) : (
               <li className="text-sm text-muted-foreground px-2 py-3">
                 <div className="flex flex-col items-center justify-center space-y-2 py-4">
@@ -913,8 +1176,33 @@ const Sidebar = () => {
           </ul>
         </div>
       </div>
+
       {/* Bottom Section: Sync Info */}
-      <div className="px-4 py-3 border-t border-border bg-muted/30"></div>
+      <div className="px-4 py-3 border-t border-border bg-muted/40">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium text-foreground truncate">
+                {lastSyncedText}
+              </span>
+            </div>
+            <button
+              className="px-3 py-1 text-xs rounded bg-primary/10 text-primary font-medium hover:bg-primary/20 transition-colors border border-primary/20 flex-shrink-0 ml-2"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? "Syncing..." : "Sync"}
+            </button>
+          </div>
+          <div className="w-full h-2 bg-border rounded mt-1 mb-1 overflow-hidden">
+            <div
+              className="h-2 bg-green-500 rounded"
+              style={{ width: syncProgress + "%" }}
+            ></div>
+          </div>
+          <div className="text-xs text-muted-foreground">{nextSyncText}</div>
+        </div>
+      </div>
 
       {/* Create Label Dialog */}
       <CreateLabelDialog
@@ -948,6 +1236,7 @@ const Sidebar = () => {
         }}
         labelId={labelToDelete?.id || null}
         labelName={labelToDelete?.name || ""}
+        childCount={labelToDelete?.childCount || 0}
         onLabelDeleted={() => {
           fetchGmailLabels();
           setShowDeleteDialog(false);
