@@ -1,19 +1,19 @@
 import React from "react";
 
 import Sidebar from "../../components/Sidebar";
-import { createClient, User } from "@supabase/supabase-js";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Fetch user session (SSR)
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-content">
       <Sidebar />
-      <main className="ml-[270px] min-h-screen bg-white overflow-y-auto">
-        {children}
+      <main className="ml-[270px] min-h-screen bg-content">
+        <div className="h-full w-full border-l border-border bg-background/80">
+          {children}
+        </div>
       </main>
     </div>
   );

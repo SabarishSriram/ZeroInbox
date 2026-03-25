@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import { FolderArrowDownIcon } from "@heroicons/react/24/outline";
 import {
@@ -27,10 +28,11 @@ const supabase = createClient(
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
-  }
+  },
 );
 
 function SubscriptionsPage() {
+  const searchParams = useSearchParams();
   const [emailData, setEmailData] = useState<EmailStats[]>([]);
   const [unsubscribedSenders, setUnsubscribedSenders] = useState<
     UnsubscribedSender[]
@@ -46,11 +48,11 @@ function SubscriptionsPage() {
   const [filterBy, setFilterBy] = useState("All");
   const [unsubscribeDialogOpen, setUnsubscribeDialogOpen] = useState(false);
   const [unsubscribeTarget, setUnsubscribeTarget] = useState<EmailStats | null>(
-    null
+    null,
   );
   const [moveToLabelDialogOpen, setMoveToLabelDialogOpen] = useState(false);
   const [moveToLabelTarget, setMoveToLabelTarget] = useState<EmailStats | null>(
-    null
+    null,
   );
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
@@ -77,6 +79,16 @@ function SubscriptionsPage() {
   useEffect(() => {
     setSelectedItems(new Set());
   }, [selectedTab]);
+
+  // Handle URL parameters for domain filtering
+  useEffect(() => {
+    const domain = searchParams.get("domain");
+    if (domain) {
+      setSearchTerm(domain);
+      // Optionally, you can also set the tab to "Inbox" to ensure the filtered results are visible
+      setSelectedTab("Inbox");
+    }
+  }, [searchParams]);
 
   const fetchEmailStats = async () => {
     try {
@@ -177,7 +189,7 @@ function SubscriptionsPage() {
         const filteredLabels = (data.labels || []).filter(
           (label: any) =>
             label.type === "user" ||
-            ["INBOX", "STARRED", "IMPORTANT"].includes(label.id)
+            ["INBOX", "STARRED", "IMPORTANT"].includes(label.id),
         );
 
         setGmailLabels(filteredLabels);
@@ -207,7 +219,7 @@ function SubscriptionsPage() {
             Authorization: `Bearer ${session.session.provider_token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       if (response.ok) {
@@ -281,11 +293,11 @@ function SubscriptionsPage() {
   });
 
   const filteredUnsubscribed = unsubscribedSenders.filter((item) =>
-    item.sender.toLowerCase().includes(searchTerm.toLowerCase())
+    item.sender.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const filteredSafe = safeSenders.filter((item) =>
-    item.domain.toLowerCase().includes(searchTerm.toLowerCase())
+    item.domain.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const sortedData = [...filteredData].sort((a, b) => {
@@ -383,7 +395,7 @@ function SubscriptionsPage() {
           {
             description: "Your inbox will be updated shortly",
             duration: 4000,
-          }
+          },
         );
         // Refresh the data after successful unsubscribe
         fetchEmailStats();
@@ -428,7 +440,7 @@ function SubscriptionsPage() {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          `Resubscribe failed: ${errorData.error || "Unknown error"}`
+          `Resubscribe failed: ${errorData.error || "Unknown error"}`,
         );
       }
 
@@ -485,7 +497,7 @@ function SubscriptionsPage() {
         setSelectedTab("Marked Safe");
       } else {
         toast.error(
-          `Failed to mark as safe: ${result.error || "Unknown error"}`
+          `Failed to mark as safe: ${result.error || "Unknown error"}`,
         );
       }
     } catch (error: any) {
@@ -528,7 +540,7 @@ function SubscriptionsPage() {
     // In a full implementation, you might want to handle multiple items
     const firstSelectedDomain = Array.from(selectedItems)[0];
     const selectedItem = sortedData.find(
-      (item) => item.domain === firstSelectedDomain
+      (item) => item.domain === firstSelectedDomain,
     );
 
     if (selectedItem) {
@@ -583,7 +595,7 @@ function SubscriptionsPage() {
         await fetchSafeSenders();
       } else {
         toast.error(
-          `Failed to remove from safe list: ${result.error || "Unknown error"}`
+          `Failed to remove from safe list: ${result.error || "Unknown error"}`,
         );
       }
     } catch (error: any) {
@@ -593,27 +605,31 @@ function SubscriptionsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <span className="inline-block w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-7 py-3 font-sans">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Subscriptions
-        </h1>
+    <div className="container mx-auto px-6 py-4 font-sans">
+      {/* Header + Tabs */}
+      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
+            Subscriptions
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review, keep, or unsubscribe from senders based on your inbox
+            activity.
+          </p>
+        </div>
+        <TabNavigation
+          tabs={tabs}
+          selectedTab={selectedTab}
+          onTabChange={setSelectedTab}
+        />
       </div>
-
-      {/* Tabs */}
-      <TabNavigation
-        tabs={tabs}
-        selectedTab={selectedTab}
-        onTabChange={setSelectedTab}
-      />
 
       {/* Search and Controls */}
       <SearchAndControls
@@ -628,22 +644,22 @@ function SubscriptionsPage() {
 
       {/* Selected Items Actions */}
       {selectedItems.size > 0 && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="mb-4 p-3 rounded-xl border border-primary/20 bg-primary/5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-800">
+            <span className="text-sm font-medium text-primary">
               {selectedItems.size} item{selectedItems.size !== 1 ? "s" : ""}{" "}
               selected
             </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedItems(new Set())}
-                className="text-xs text-blue-600 hover:text-blue-800 underline"
+                className="text-xs text-primary hover:text-primary/80 underline"
               >
                 Clear selection
               </button>
               <button
                 onClick={handleBulkMoveToLabel}
-                className="px-3 py-1 bg-blue-500 text-white text-xs font-medium rounded hover:bg-blue-600 transition-colors flex items-center gap-1"
+                className="px-3 py-1 bg-primary text-primary-foreground text-xs font-medium rounded hover:bg-primary/90 transition-colors flex items-center gap-1"
               >
                 <FolderArrowDownIcon className="w-4 h-4" />
                 Move to Label
