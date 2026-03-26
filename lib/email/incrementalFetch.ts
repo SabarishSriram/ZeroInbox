@@ -4,7 +4,7 @@ import { google } from "googleapis";
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
   maxRetries = 3,
-  initialDelay = 1000
+  initialDelay = 1000,
 ): Promise<T> {
   let retries = 0,
     delay = initialDelay;
@@ -31,7 +31,7 @@ export async function fetchAndStoreIncrementalEmails({
 }: {
   accessToken: string;
   userId: string;
-  userEmail: string;
+  userEmail: string | null;
 }) {
   // Create Supabase client
   const supabase = await createClient();
@@ -75,7 +75,7 @@ export async function fetchAndStoreIncrementalEmails({
         userId: "me",
         q: query,
         pageToken: nextPageToken ?? undefined,
-      })
+      }),
     );
     const messages = (res.data.messages || [])
       .filter((msg) => typeof msg.id === "string")
@@ -97,9 +97,9 @@ export async function fetchAndStoreIncrementalEmails({
             id: msg.id,
             format: "metadata",
             metadataHeaders: ["From", "Date"],
-          })
-        )
-      )
+          }),
+        ),
+      ),
     );
     allEmailData.push(
       ...batchResults.map((res) => {
@@ -107,7 +107,7 @@ export async function fetchAndStoreIncrementalEmails({
         const from = headers.find((h: any) => h.name === "From")?.value || "";
         const date = headers.find((h: any) => h.name === "Date")?.value || "";
         return { from, date };
-      })
+      }),
     );
   }
 
@@ -143,7 +143,7 @@ export async function fetchAndStoreIncrementalEmails({
         updated_at: new Date().toISOString(),
         user_id: userId,
       };
-    }
+    },
   );
 
   // 5. Batch upsert

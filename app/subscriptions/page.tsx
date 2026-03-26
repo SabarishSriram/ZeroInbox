@@ -31,7 +31,7 @@ const supabase = createClient(
   },
 );
 
-function SubscriptionsPage() {
+function SubscriptionsPageContent() {
   const searchParams = useSearchParams();
   const [emailData, setEmailData] = useState<EmailStats[]>([]);
   const [unsubscribedSenders, setUnsubscribedSenders] = useState<
@@ -760,4 +760,16 @@ function SubscriptionsPage() {
   );
 }
 
-export default SubscriptionsPage;
+export default function SubscriptionsPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <span className="inline-block w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <SubscriptionsPageContent />
+    </React.Suspense>
+  );
+}

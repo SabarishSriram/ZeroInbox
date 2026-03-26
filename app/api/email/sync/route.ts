@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   // You may need to get the provider_token for Gmail API access
   const accessToken = session.provider_token;
   const userId = session.user.id;
-  const userEmail = session.user.email;
+  const userEmail = session.user.email ?? null;
 
   if (!accessToken) {
     return NextResponse.json(
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
         error:
           "No Google access token found. Please sign in with Google again.",
       },
-      { status: 401 }
+      { status: 401 },
     );
   }
   if (!userId) {
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   } catch (error: any) {
     return NextResponse.json(
       { error: error.message || "Sync failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
