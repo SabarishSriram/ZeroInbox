@@ -9,10 +9,6 @@ const nextConfig: NextConfig = {
       "logo.clearbit.com",
     ],
   },
-  eslint: {
-    // Disable ESLint checks during production builds to avoid build failures
-    ignoreDuringBuilds: true,
-  },
 };
 
 export default nextConfig;
